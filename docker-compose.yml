@@ -104,6 +104,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=${PORT:-9000}
+      - BFF_INTERNAL_URL=http://bff:3001
       - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL:-https://estuda-anne.singulartech.space}
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://estuda-anne.singulartech.space}
     depends_on:
