@@ -126,30 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveAuthSession(userData, data.token)
       return { success: true }
     } catch (err: any) {
-      console.warn('Backend BFF inacessível no momento, usando fallback se aplicável:', err)
-      if (email.toLowerCase().includes('admin') || passwordText === 'admin123') {
-        saveAuthSession(DEMO_ADMIN, 'mock-jwt-token-admin')
-        return { success: true }
-      } else if (email.length > 0 && passwordText.length > 0) {
-        saveAuthSession(
-          {
-            id: 'user-custom-id',
-            name: email.split('@')[0] || 'Estudante Anne',
-            email,
-            role: 'STUDENT',
-            course: '',
-            period: '',
-            subjects: [],
-            studyGoalMinutes: 45,
-            isProfileComplete: false,
-          },
-          'mock-jwt-token-student'
-        )
-        return { success: true }
-      }
+      console.error('Erro de autenticação no BFF:', err)
       return {
         success: false,
-        error: 'Erro de conexão com o servidor de autenticação.',
+        error: 'Não foi possível conectar ao servidor de autenticação. Tente novamente mais tarde.',
       }
     }
   }

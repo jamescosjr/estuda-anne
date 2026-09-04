@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 export function LoginScreen() {
-  const { login, loginAsDemo } = useAuth()
+  const { login } = useAuth()
   const [selectedRole, setSelectedRole] = useState<'STUDENT' | 'ADMIN'>('STUDENT')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,10 +29,6 @@ export function LoginScreen() {
     if (!result.success && result.error) {
       setErrorMessage(result.error)
     }
-  }
-
-  function handleDemoClick(role: 'STUDENT' | 'ADMIN') {
-    loginAsDemo(role)
   }
 
   return (
@@ -61,11 +57,7 @@ export function LoginScreen() {
           <div className="mb-6 grid grid-cols-2 gap-1.5 rounded-xl bg-muted/60 p-1">
             <button
               type="button"
-              onClick={() => {
-                setSelectedRole('STUDENT')
-                setEmail('ana.nogueira@estudante.ufmg.br')
-                setPassword('senha123')
-              }}
+              onClick={() => setSelectedRole('STUDENT')}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all duration-200 sm:text-sm',
                 selectedRole === 'STUDENT'
@@ -78,11 +70,7 @@ export function LoginScreen() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setSelectedRole('ADMIN')
-                setEmail('admin@estuda-anne.com')
-                setPassword('admin123')
-              }}
+              onClick={() => setSelectedRole('ADMIN')}
               className={cn(
                 'flex items-center justify-center gap-2 rounded-lg py-2.5 text-xs font-semibold transition-all duration-200 sm:text-sm',
                 selectedRole === 'ADMIN'
@@ -167,40 +155,6 @@ export function LoginScreen() {
               <ArrowRight className="size-4" />
             </Button>
           </form>
-
-          {/* Quick Demo Access Divider */}
-          <div className="relative my-6 text-center text-xs">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border/60" />
-            </div>
-            <span className="relative bg-card px-3 text-muted-foreground font-medium">
-              Ou acesse em 1-clique (Modo Demo)
-            </span>
-          </div>
-
-          {/* Quick Demo Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleDemoClick('STUDENT')}
-              className="w-full justify-center gap-1.5 rounded-xl border-dashed text-xs font-medium"
-            >
-              <UserCheck className="size-3.5 text-primary" />
-              Demo Estudante
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => handleDemoClick('ADMIN')}
-              className="w-full justify-center gap-1.5 rounded-xl border-dashed text-xs font-medium"
-            >
-              <ShieldCheck className="size-3.5 text-chart-1" />
-              Demo Admin
-            </Button>
-          </div>
         </div>
 
         {/* Footer info */}
