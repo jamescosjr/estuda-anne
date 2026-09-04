@@ -1,4 +1,10 @@
+ARG NEXT_PUBLIC_BFF_URL=https://estuda-anne.singulartech.space
+ARG NEXT_PUBLIC_API_URL=https://estuda-anne.singulartech.space
+
 FROM node:20-alpine AS builder
+
+ARG NEXT_PUBLIC_BFF_URL
+ARG NEXT_PUBLIC_API_URL
 
 WORKDIR /app
 
@@ -15,6 +21,8 @@ COPY apps/frontend apps/frontend
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+ENV NEXT_PUBLIC_BFF_URL=$NEXT_PUBLIC_BFF_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 RUN pnpm --filter @estuda-anne/frontend build
 

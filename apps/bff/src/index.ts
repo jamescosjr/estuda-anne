@@ -11,7 +11,26 @@ dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 export async function bootstrapBFF() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      const allowedOrigins = [
+        'https://estuda-anne.singulartech.space',
+        'http://estuda-anne.singulartech.space',
+      ];
+      if (process.env.CORS_ORIGIN) {
+        allowedOrigins.push(process.env.CORS_ORIGIN);
+      }
+      if (
+        allowedOrigins.includes(origin) ||
+        /^http:\/\/localhost(:\d+)?$/.test(origin) ||
+        /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)
+      ) {
+        return cb(null, true);
+      }
+      return cb(new Error('Not allowed by CORS'), false);
+    },
+  });
   await app.register(studyRoutes);
   await app.register(authRoutes);
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Sparkles, Check, BookOpen, User, GraduationCap, Calendar, Clock } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
+import { getApiUrl } from '@/lib/api-config'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +61,7 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
       })
 
       // Requisitar geração de cronograma no BFF
-      const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+      const bffUrl = getApiUrl()
       await fetch(`${bffUrl}/api/study/schedule/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

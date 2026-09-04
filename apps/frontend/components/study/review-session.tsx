@@ -7,13 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Flashcard, type Difficulty } from './flashcard'
+import { getApiUrl } from '@/lib/api-config'
 
 export function ReviewSession() {
   const [cards, setCards] = useState<FlashcardItem[]>(defaultFlashcards)
   const [current, setCurrent] = useState(0)
   const [done, setDone] = useState(false)
   const total = cards.length
-  const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+  const bffUrl = getApiUrl()
 
   useEffect(() => {
     async function loadDueCards() {

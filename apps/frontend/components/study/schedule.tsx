@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth-context'
+import { getApiUrl } from '@/lib/api-config'
 
 const typeMeta: Record<
   ScheduleEvent['type'],
@@ -132,7 +133,7 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
     }
 
     setClosing(true)
-    const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+    const bffUrl = getApiUrl()
     try {
       const response = await fetch(`${bffUrl}/api/semesters/close`, {
         method: 'POST',

@@ -14,6 +14,7 @@ import { recentUploads, type UploadItem } from '@/lib/mock-data'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { UploadZone } from './upload-zone'
+import { getApiUrl } from '@/lib/api-config'
 
 const kindIcon = {
   PDF: FileText,
@@ -49,7 +50,7 @@ function StatusBadge({ status }: { status: UploadItem['status'] }) {
 
 export function Materials() {
   const [uploads, setUploads] = useState<UploadItem[]>(recentUploads)
-  const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+  const bffUrl = getApiUrl()
 
   useEffect(() => {
     async function loadBackendMaterials() {
@@ -80,7 +81,7 @@ export function Materials() {
   }, [bffUrl])
 
   async function handleFiles(fileNames: string[]) {
-    const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+    const bffUrl = getApiUrl()
 
     for (let i = 0; i < fileNames.length; i++) {
       const name = fileNames[i]

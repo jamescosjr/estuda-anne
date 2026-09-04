@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { useAuth } from '@/lib/auth-context'
+import { getApiUrl } from '@/lib/api-config'
 
 interface StudentUser {
   id: string
@@ -59,7 +60,7 @@ export function AdminStudentsManagement() {
   const [editPassword, setEditPassword] = useState('')
   const [updating, setUpdating] = useState(false)
 
-  const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+  const bffUrl = getApiUrl()
 
   // Sincroniza token global do AuthContext caso o usuário esteja logado como ADMIN
   useEffect(() => {

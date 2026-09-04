@@ -1,6 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect } from 'react'
+import { getApiUrl } from '@/lib/api-config'
 
 export interface User {
   id: string
@@ -93,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function login(email: string, passwordText: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+      const bffUrl = getApiUrl()
       const response = await fetch(`${bffUrl}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -176,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const bffUrl = process.env.NEXT_PUBLIC_BFF_URL || 'http://localhost:3001'
+      const bffUrl = getApiUrl()
       await fetch(`${bffUrl}/api/users/profile`, {
         method: 'PUT',
         headers: {

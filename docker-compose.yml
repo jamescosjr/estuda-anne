@@ -24,10 +24,12 @@ services:
     restart: always
     ports:
       - "3005:3005"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - AUTH_SERVICE_PORT=3005
-      - MONGODB_URI=mongodb://mongodb:27017/estuda-anne
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
       - JWT_SECRET=${JWT_SECRET:-secret_jwt_estuda_anne_key_2026}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@estuda-anne.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
@@ -45,15 +47,18 @@ services:
     restart: always
     ports:
       - "3002:3002"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - STUDY_ENGINE_PORT=3002
-      - MONGODB_URI=mongodb://mongodb:27017/estuda-anne
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLOUDFLARE_R2_ACCOUNT_ID=${CLOUDFLARE_R2_ACCOUNT_ID}
       - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}
       - CLOUDFLARE_R2_SECRET_ACCESS_KEY=${CLOUDFLARE_R2_SECRET_ACCESS_KEY}
-      - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME:-estuda-anne-materials}
+      - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME:-estuda-anne}
+      - CLOUDFLARE_R2_ENDPOINT=${CLOUDFLARE_R2_ENDPOINT}
     depends_on:
       - mongodb
     networks:
@@ -68,11 +73,14 @@ services:
     restart: always
     ports:
       - "3001:3001"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - BFF_PORT=3001
       - AUTH_SERVICE_URL=http://auth:3005
       - STUDY_ENGINE_URL=http://study-engine:3002
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://estuda-anne.singulartech.space}
     depends_on:
       - auth
       - study-engine
@@ -84,14 +92,20 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        NEXT_PUBLIC_BFF_URL: ${NEXT_PUBLIC_BFF_URL:-https://estuda-anne.singulartech.space}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://estuda-anne.singulartech.space}
     container_name: estuda-anne-frontend
     restart: always
     ports:
       - "9000:9000"
+    env_file:
+      - .env
     environment:
       - NODE_ENV=production
       - PORT=${PORT:-9000}
-      - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL:-http://localhost:3001}
+      - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL:-https://estuda-anne.singulartech.space}
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-https://estuda-anne.singulartech.space}
     depends_on:
       - bff
     networks:
