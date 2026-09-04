@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  # Banco de Dados MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: estuda-anne-mongo
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: estuda-anne
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - estuda-anne-network
+
+  # Serviço de Autenticação & Usuários
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile.auth
+    container_name: estuda-anne-auth
+    restart: always
+    ports:
+      - "3005:3005"
+    environment:
+      - NODE_ENV=production
+      - AUTH_SERVICE_PORT=3005
+      - MONGODB_URI=mongodb://mongodb:27017/estuda-anne
+      - JWT_SECRET=${JWT_SECRET:-secret_jwt_estuda_anne_key_2026}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@estuda-anne.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+    depends_on:
+      - mongodb
+    networks:
+      - estuda-anne-network
+
+  # Motor de Estudos (IA & Spaced Repetition)
+  study-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.study-engine
+    container_name: estuda-anne-study-engine
+    restart: always
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - STUDY_ENGINE_PORT=3002
+      - MONGODB_URI=mongodb://mongodb:27017/estuda-anne
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CLOUDFLARE_R2_ACCOUNT_ID=${CLOUDFLARE_R2_ACCOUNT_ID}
+      - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}
+      - CLOUDFLARE_R2_SECRET_ACCESS_KEY=${CLOUDFLARE_R2_SECRET_ACCESS_KEY}
+      - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME:-estuda-anne-materials}
+    depends_on:
+      - mongodb
+    networks:
+      - estuda-anne-network
+
+  # Backend For Frontend (BFF)
+  bff:
+    build:
+      context: .
+      dockerfile: Dockerfile.bff
+    container_name: estuda-anne-bff
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - BFF_PORT=3001
+      - AUTH_SERVICE_URL=http://auth:3005
+      - STUDY_ENGINE_URL=http://study-engine:3002
+    depends_on:
+      - auth
+      - study-engine
+    networks:
+      - estuda-anne-network
+
+  # Frontend Web (Next.js)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: estuda-anne-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL:-http://localhost:3001}
+    depends_on:
+      - bff
+    networks:
+      - estuda-anne-network
+
+  # Proxy Reverso Nginx
+  nginx:
+    image: nginx:alpine
+    container_name: estuda-anne-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    depends_on:
+      - frontend
+      - bff
+    networks:
+      - estuda-anne-network
+
+volumes:
+  mongo_data:
+  certbot_etc:
+  certbot_var:
+
+networks:
+  estuda-anne-network:
+    driver: bridge

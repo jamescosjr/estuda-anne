@@ -1,0 +1,32 @@
+{
+  "name": "@estuda-anne/auth",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serviço de Autenticação e Gestão de Usuários com RBAC (Estuda Anne)",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "echo 'linting auth'",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@estuda-anne/shared": "workspace:*",
+    "@fastify/cors": "^10.0.2",
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^16.4.7",
+    "fastify": "^5.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.13.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.9",
+    "@types/node": "^22.13.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.6"
+  }
+}

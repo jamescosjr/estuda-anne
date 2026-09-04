@@ -1,0 +1,39 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/study-engine/package.json apps/study-engine/
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages/shared packages/shared
+COPY apps/study-engine apps/study-engine
+
+RUN pnpm --filter @estuda-anne/shared build
+RUN pnpm --filter @estuda-anne/study-engine build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV STUDY_ENGINE_PORT=3002
+ENV STUDY_ENGINE_HOST=0.0.0.0
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/study-engine/package.json apps/study-engine/
+
+RUN pnpm install --prod --frozen-lockfile
+
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/apps/study-engine/dist ./apps/study-engine/dist
+
+EXPOSE 3002
+
+CMD ["node", "apps/study-engine/dist/index.js"]

@@ -1,0 +1,22 @@
+{
+  "name": "estuda-anne",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Estuda Anne — SaaS educacional impulsionado por IA (Monorepo Turborepo + pnpm)",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.4",
+    "typescript": "^5.7.3",
+    "prettier": "^3.5.2"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,106 @@
+'use client'
+
+import { useRef, useState } from 'react'
+import { FileText, FileUp, Film, Image as ImageIcon, Music, Presentation, UploadCloud } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+
+const acceptedTypes = [
+  { label: 'PDF', icon: FileText, hint: 'Apostilas e resumos' },
+  { label: 'PPTX', icon: Presentation, hint: 'Slides de aula' },
+  { label: 'Fotos', icon: ImageIcon, hint: 'Provas e listas (JPG, PNG, WebP)' },
+  { label: 'MP4 / MP3', icon: Film, hint: 'Aulas em vídeo e áudio' },
+]
+
+interface UploadZoneProps {
+  onFiles?: (fileNames: string[]) => void
+}
+
+export function UploadZone({ onFiles }: UploadZoneProps) {
+  const [dragging, setDragging] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function handleFiles(list: FileList | null) {
+    if (!list || list.length === 0) return
+    onFiles?.(Array.from(list).map((f) => f.name))
+  }
+
+  return (
+    <div>
+      <div
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragging(true)
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragging(false)
+          handleFiles(e.dataTransfer.files)
+        }}
+        role="button"
+        tabIndex={0}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            inputRef.current?.click()
+          }
+        }}
+        className={cn(
+          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-12 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+          dragging
+            ? 'border-primary bg-primary/5'
+            : 'border-border bg-muted/40 hover:border-primary/50 hover:bg-muted/70',
+        )}
+      >
+        <span
+          className={cn(
+            'mb-4 flex size-14 items-center justify-center rounded-2xl transition-colors',
+            dragging ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
+          )}
+        >
+          <UploadCloud className="size-7" />
+        </span>
+        <p className="font-display text-base font-semibold">
+          Arraste e solte seus arquivos ou fotos de provas aqui
+        </p>
+        <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
+          Ou clique para selecionar. A Anne aceita apostilas, slides e imagens de exercícios para gerar resumos e quizzes.
+        </p>
+        <Button className="mt-5" size="lg">
+          <FileUp />
+          Selecionar arquivos ou fotos
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          multiple
+          accept=".pdf,.pptx,.mp4,.mp3,.jpg,.jpeg,.png,.webp"
+          className="sr-only"
+          onChange={(e) => handleFiles(e.target.files)}
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {acceptedTypes.map((type) => {
+          const Icon = type.icon
+          return (
+            <div
+              key={type.label}
+              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3"
+            >
+              <span className="flex size-9 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <Icon className="size-4.5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">{type.label}</p>
+                <p className="truncate text-xs text-muted-foreground">{type.hint}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

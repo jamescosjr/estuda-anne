@@ -1,0 +1,61 @@
+name: CI/CD Pipeline — Estuda Anne
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  # 1. Integração Contínua (CI): Instalação, Lint e Testes Automatizados
+  test-and-lint:
+    name: 🧪 Testes e Build (CI)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout do Código
+        uses: actions/checkout@v4
+
+      - name: 📦 Configurar pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.15.9
+
+      - name: 🟢 Configurar Node.js (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: 📥 Instalar Dependências
+        run: pnpm install --frozen-lockfile
+
+      - name: 🧪 Executar Suíte de Testes Automatizados
+        run: pnpm test
+
+      - name: 🏗️ Executar Build de Validação do Monorepo
+        run: pnpm build
+
+  # 2. Entrega Contínua (CD): Deploy Automatizado na VPS via Docker
+  deploy-to-vps:
+    name: 🚀 Deploy na VPS (CD)
+    needs: test-and-lint
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🌐 Executar Deploy Remoto via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            echo "Starting deploy on VPS..."
+            cd /opt/estuda-anne || exit 1
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
+            docker system prune -f
+            echo "Deploy completed successfully!"
