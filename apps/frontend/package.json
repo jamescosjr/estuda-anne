@@ -4,9 +4,9 @@
   "private": true,
   "description": "Frontend da aplicação Estuda Anne (Next.js)",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p ${PORT:-9000}",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p ${PORT:-9000}",
     "lint": "next lint"
   },
   "dependencies": {

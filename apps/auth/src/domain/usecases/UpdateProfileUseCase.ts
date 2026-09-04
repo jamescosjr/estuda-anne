@@ -15,11 +15,12 @@ export class UpdateProfileUseCase {
   constructor(private readonly userRepository: IUserRepository) {}
 
   public async execute(dto: UpdateProfileDTO): Promise<User> {
-    if (!dto.executor || !dto.executor.sub) {
+    const userId = dto.executor?.userId || dto.executor?.sub;
+    if (!dto.executor || !userId) {
       throw new Error('Acesso negado: token inválido');
     }
 
-    const user = await this.userRepository.findById(dto.executor.sub);
+    const user = await this.userRepository.findById(userId);
     if (!user) {
       throw new Error('Usuário não encontrado');
     }

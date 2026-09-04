@@ -87,9 +87,10 @@ services:
     container_name: estuda-anne-frontend
     restart: always
     ports:
-      - "3000:3000"
+      - "9000:9000"
     environment:
       - NODE_ENV=production
+      - PORT=${PORT:-9000}
       - NEXT_PUBLIC_BFF_URL=${NEXT_PUBLIC_BFF_URL:-http://localhost:3001}
     depends_on:
       - bff

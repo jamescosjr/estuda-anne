@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { CreateStudentUserUseCase } from '../../domain/usecases/CreateStudentUserUseCase.js';
 import { UpdateStudentUserUseCase } from '../../domain/usecases/UpdateStudentUserUseCase.js';
 import { DeleteStudentUserUseCase } from '../../domain/usecases/DeleteStudentUserUseCase.js';
+import { UpdateProfileUseCase } from '../../domain/usecases/UpdateProfileUseCase.js';
 import { IUserRepository } from '../../domain/ports/IUserRepository.js';
 
 const CreateStudentSchema = z.object({

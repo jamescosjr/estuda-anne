@@ -1,7 +1,12 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import dotenv from 'dotenv';
+import path from 'path';
 import { studyRoutes } from './application/routes/studyRoutes.js';
 import { authRoutes } from './application/routes/authRoutes.js';
+
+dotenv.config();
+dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 export async function bootstrapBFF() {
   const app = Fastify({ logger: true });

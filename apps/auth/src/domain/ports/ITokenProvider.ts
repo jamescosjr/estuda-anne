@@ -4,6 +4,7 @@ export interface TokenPayload {
   userId: string;
   email: string;
   role: UserRole;
+  sub?: string;
 }
 
 export interface ITokenProvider {

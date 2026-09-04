@@ -22,7 +22,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=9000
 ENV HOSTNAME="0.0.0.0"
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -37,6 +37,6 @@ RUN pnpm install --prod --frozen-lockfile
 COPY --from=builder /app/apps/frontend/public ./apps/frontend/public
 COPY --from=builder /app/apps/frontend/.next ./apps/frontend/.next
 
-EXPOSE 3000
+EXPOSE 9000
 
 CMD ["pnpm", "--filter", "@estuda-anne/frontend", "start"]

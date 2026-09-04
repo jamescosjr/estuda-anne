@@ -1,5 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NODE_ENV",
+    "BFF_PORT",
+    "STUDY_ENGINE_PORT",
+    "AUTH_SERVICE_PORT",
+    "MONGODB_URI",
+    "JWT_SECRET",
+    "GEMINI_API_KEY",
+    "NEXT_PUBLIC_BFF_URL",
+    "CLOUDFLARE_R2_ACCOUNT_ID",
+    "CLOUDFLARE_R2_ACCESS_KEY_ID",
+    "CLOUDFLARE_R2_SECRET_ACCESS_KEY",
+    "CLOUDFLARE_R2_BUCKET_NAME"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

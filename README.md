@@ -137,7 +137,7 @@ pnpm dev
 ```
 
 As aplicações estarão disponíveis em:
-- **Frontend**: `http://localhost:3000`
+- **Frontend**: `http://localhost:9000`
 - **BFF (Backend For Frontend)**: `http://localhost:3001`
 - **Study Engine**: `http://localhost:3002`
 - **Auth Service**: `http://localhost:3005`
