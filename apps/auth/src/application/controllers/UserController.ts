@@ -28,6 +28,18 @@ const UpdateProfileSchema = z.object({
   name: z.string().min(2).optional(),
   course: z.string().optional(),
   period: z.string().optional(),
+  periodStartDate: z.string().optional(),
+  periodEndDate: z.string().optional(),
+  examDates: z
+    .array(
+      z.object({
+        id: z.string(),
+        subject: z.string(),
+        title: z.string(),
+        date: z.string(),
+      })
+    )
+    .optional(),
   subjects: z.array(z.string()).optional(),
   studyGoalMinutes: z.number().positive().optional(),
 });
@@ -80,6 +92,9 @@ export class UserController {
       name: body.name,
       course: body.course,
       period: body.period,
+      periodStartDate: body.periodStartDate,
+      periodEndDate: body.periodEndDate,
+      examDates: body.examDates,
       subjects: body.subjects,
       studyGoalMinutes: body.studyGoalMinutes,
     });

@@ -10,6 +10,9 @@ interface MongoUserDoc {
   role: UserRole;
   course?: string;
   period?: string;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  examDates?: Array<{ id: string; subject: string; title: string; date: string }>;
   subjects?: string[];
   studyGoalMinutes?: number;
   isProfileComplete?: boolean;
@@ -45,6 +48,9 @@ export class MongoUserRepository implements IUserRepository {
       role: user.role,
       course: user.course,
       period: user.period,
+      periodStartDate: user.periodStartDate,
+      periodEndDate: user.periodEndDate,
+      examDates: user.examDates,
       subjects: user.subjects,
       studyGoalMinutes: user.studyGoalMinutes,
       isProfileComplete: user.isProfileComplete,
@@ -110,6 +116,9 @@ export class MongoUserRepository implements IUserRepository {
       role: doc.role,
       course: doc.course,
       period: doc.period,
+      periodStartDate: doc.periodStartDate,
+      periodEndDate: doc.periodEndDate,
+      examDates: doc.examDates,
       subjects: doc.subjects,
       studyGoalMinutes: doc.studyGoalMinutes,
       isProfileComplete: doc.isProfileComplete,

@@ -3,6 +3,7 @@ import {
   MaterialAnalysisResult,
   GeneratedFlashcardDTO,
   GeneratedQuizQuestionDTO,
+  ParsedScheduleAnalysisResult,
 } from '../../domain/ports/ILanguageModelService.js';
 import { env } from '../config/env.js';
 
@@ -161,5 +162,92 @@ ${content.slice(0, 10000)}`;
     const data = await response.json() as any;
     const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
     return JSON.parse(textOutput);
+  }
+
+  public async analyzeScheduleImageOrDocument(fileData: {
+    mimeType?: string;
+    dataBase64?: string;
+    textContent?: string;
+  }): Promise<ParsedScheduleAnalysisResult> {
+    if (!this.apiKey) {
+      // Fallback inteligente para desenvolvimento/offline
+      const text = fileData.textContent || '';
+      return {
+        periodStartDate: new Date().toISOString().split('T')[0],
+        periodEndDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        subjects: ['Cálculo I', 'Algoritmos e Estruturas de Dados', 'Engenharia de Software'],
+        examDates: [
+          { subject: 'Cálculo I', title: 'Prova P1 (Derivadas)', date: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+          { subject: 'Algoritmos e Estruturas de Dados', title: 'Trabalho Prático 1', date: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+        ],
+        suggestedScheduleEvents: [
+          { day: 'Seg', date: 'Segunda', title: 'Revisão espaçada — Cálculo I', subject: 'Cálculo I', type: 'flashcards', time: '18:00' },
+          { day: 'Ter', date: 'Terça', title: 'Quiz — Algoritmos', subject: 'Algoritmos e Estruturas de Dados', type: 'quiz', time: '19:30' },
+        ],
+      };
+    }
+
+    const prompt = `Analise a imagem/documento do cronograma ou ementa acadêmica a seguir.
+Extraia:
+1. Data de início do período (ISO: YYYY-MM-DD, se identificável).
+2. Data de fim do período (ISO: YYYY-MM-DD, se identificável).
+3. Lista de nomes de matérias/disciplinas identificadas.
+4. Datas de provas, trabalhos e avaliações por matéria (subject, title, date no formato YYYY-MM-DD).
+5. Sugestão inicial de eventos de estudo (day, date, title, subject, type: "quiz"|"flashcards"|"leitura"|"resumo", time: "18:00").
+
+Formato JSON estrito esperado:
+{
+  "periodStartDate": "YYYY-MM-DD",
+  "periodEndDate": "YYYY-MM-DD",
+  "subjects": ["Matéria 1", "Matéria 2"],
+  "examDates": [
+    { "subject": "Matéria 1", "title": "Prova P1", "date": "YYYY-MM-DD" }
+  ],
+  "suggestedScheduleEvents": [
+    { "day": "Seg", "date": "10 Mar", "title": "Revisão P1", "subject": "Matéria 1", "type": "flashcards", "time": "18:00" }
+  ]
+}`;
+
+    const parts: any[] = [];
+    if (fileData.dataBase64) {
+      parts.push({
+        inlineData: {
+          mimeType: fileData.mimeType || 'image/png',
+          data: fileData.dataBase64,
+        },
+      });
+    }
+    if (fileData.textContent) {
+      parts.push({ text: `Texto extraído do documento: ${fileData.textContent}` });
+    }
+    parts.push({ text: prompt });
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as any;
+    const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parsed = JSON.parse(textOutput);
+
+    return {
+      periodStartDate: parsed.periodStartDate,
+      periodEndDate: parsed.periodEndDate,
+      subjects: parsed.subjects || [],
+      examDates: parsed.examDates || [],
+      suggestedScheduleEvents: parsed.suggestedScheduleEvents || [],
+    };
   }
 }

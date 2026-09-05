@@ -1,5 +1,12 @@
 export type UserRole = 'ADMIN' | 'STUDENT';
 
+export interface ExamDateItem {
+  id: string;
+  subject: string;
+  title: string;
+  date: string;
+}
+
 export interface UserProps {
   id?: string;
   name: string;
@@ -8,6 +15,9 @@ export interface UserProps {
   role: UserRole;
   course?: string;
   period?: string;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  examDates?: ExamDateItem[];
   subjects?: string[];
   studyGoalMinutes?: number;
   isProfileComplete?: boolean;
@@ -23,6 +33,9 @@ export class User {
   private readonly _role: UserRole;
   private _course?: string;
   private _period?: string;
+  private _periodStartDate?: string;
+  private _periodEndDate?: string;
+  private _examDates: ExamDateItem[];
   private _subjects: string[];
   private _studyGoalMinutes?: number;
   private _isProfileComplete: boolean;
@@ -47,6 +60,9 @@ export class User {
     this._role = props.role;
     this._course = props.course?.trim();
     this._period = props.period?.trim();
+    this._periodStartDate = props.periodStartDate?.trim();
+    this._periodEndDate = props.periodEndDate?.trim();
+    this._examDates = props.examDates || [];
     this._subjects = props.subjects || [];
     this._studyGoalMinutes = props.studyGoalMinutes || 45;
     this._isProfileComplete = props.isProfileComplete ?? (props.role === 'ADMIN' || Boolean(props.course && props.period));
@@ -80,6 +96,18 @@ export class User {
 
   public get period(): string | undefined {
     return this._period;
+  }
+
+  public get periodStartDate(): string | undefined {
+    return this._periodStartDate;
+  }
+
+  public get periodEndDate(): string | undefined {
+    return this._periodEndDate;
+  }
+
+  public get examDates(): ExamDateItem[] {
+    return this._examDates;
   }
 
   public get subjects(): string[] {
@@ -126,6 +154,9 @@ export class User {
     name?: string;
     course?: string;
     period?: string;
+    periodStartDate?: string;
+    periodEndDate?: string;
+    examDates?: ExamDateItem[];
     subjects?: string[];
     studyGoalMinutes?: number;
   }): void {
@@ -138,6 +169,15 @@ export class User {
     }
     if (data.period !== undefined) {
       this._period = data.period.trim();
+    }
+    if (data.periodStartDate !== undefined) {
+      this._periodStartDate = data.periodStartDate.trim();
+    }
+    if (data.periodEndDate !== undefined) {
+      this._periodEndDate = data.periodEndDate.trim();
+    }
+    if (data.examDates !== undefined) {
+      this._examDates = data.examDates;
     }
     if (data.subjects !== undefined) {
       this._subjects = data.subjects.map((s) => s.trim()).filter(Boolean);
@@ -163,6 +203,9 @@ export class User {
       role: this._role,
       course: this._course,
       period: this._period,
+      periodStartDate: this._periodStartDate,
+      periodEndDate: this._periodEndDate,
+      examDates: this._examDates,
       subjects: this._subjects,
       studyGoalMinutes: this._studyGoalMinutes,
       isProfileComplete: this._isProfileComplete,

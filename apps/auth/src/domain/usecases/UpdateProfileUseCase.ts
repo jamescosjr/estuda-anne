@@ -1,4 +1,4 @@
-import { User } from '../entities/User.js';
+import { User, ExamDateItem } from '../entities/User.js';
 import { IUserRepository } from '../ports/IUserRepository.js';
 import { TokenPayload } from '../ports/ITokenProvider.js';
 
@@ -7,6 +7,9 @@ export interface UpdateProfileDTO {
   name?: string;
   course?: string;
   period?: string;
+  periodStartDate?: string;
+  periodEndDate?: string;
+  examDates?: ExamDateItem[];
   subjects?: string[];
   studyGoalMinutes?: number;
 }
@@ -29,6 +32,9 @@ export class UpdateProfileUseCase {
       name: dto.name,
       course: dto.course,
       period: dto.period,
+      periodStartDate: dto.periodStartDate,
+      periodEndDate: dto.periodEndDate,
+      examDates: dto.examDates,
       subjects: dto.subjects,
       studyGoalMinutes: dto.studyGoalMinutes,
     });

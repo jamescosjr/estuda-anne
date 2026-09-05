@@ -1,13 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BookOpen, FileText, ListChecks, NotebookPen, Trash2, CheckCircle2, Sparkles, UserCog } from 'lucide-react'
-import { scheduleEvents, type ScheduleEvent } from '@/lib/mock-data'
+import { BookOpen, FileText, ListChecks, NotebookPen, Trash2, CheckCircle2, Sparkles, CalendarDays, CalendarClock } from 'lucide-react'
+import { type ScheduleEvent } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth, ExamDateItem } from '@/lib/auth-context'
 import { getApiUrl } from '@/lib/api-config'
 
 const typeMeta: Record<
@@ -20,7 +20,7 @@ const typeMeta: Record<
   resumo: { label: 'Resumo', icon: NotebookPen, className: 'bg-chart-3/20 text-chart-3' },
 }
 
-function generateEventsForSubjects(subjects: string[]): ScheduleEvent[] {
+function generateEventsForUser(subjects: string[], examDates?: ExamDateItem[]): ScheduleEvent[] {
   if (!subjects || subjects.length === 0) return []
 
   const types: ScheduleEvent['type'][] = ['flashcards', 'quiz', 'leitura', 'resumo']
@@ -33,6 +33,22 @@ function generateEventsForSubjects(subjects: string[]): ScheduleEvent[] {
 
   const items: ScheduleEvent[] = []
   let count = 1
+
+  // Adiciona revisões intensivas de exames/provas cadastrados
+  if (examDates && examDates.length > 0) {
+    examDates.forEach((ex) => {
+      items.push({
+        id: `exam-ev-${ex.id}`,
+        day: 'Prova em breve',
+        date: ex.date,
+        title: `Revisão Prioritária — ${ex.title}`,
+        subject: ex.subject,
+        type: 'flashcards',
+        time: '19:00',
+        done: false,
+      })
+    })
+  }
 
   days.forEach((d, dayIdx) => {
     const daySubjects = [
@@ -49,7 +65,7 @@ function generateEventsForSubjects(subjects: string[]): ScheduleEvent[] {
       else actionTitle = `Resumo automático de ${sub}`
 
       items.push({
-        id: `dyn-e${count++}`,
+        id: `user-e-${count++}`,
         day: d.day,
         date: d.date,
         title: actionTitle,
@@ -109,11 +125,11 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
 
   useEffect(() => {
     if (user?.subjects && user.subjects.length > 0) {
-      setEvents(generateEventsForSubjects(user.subjects))
+      setEvents(generateEventsForUser(user.subjects, user.examDates))
     } else {
-      setEvents(scheduleEvents)
+      setEvents([])
     }
-  }, [user?.subjects])
+  }, [user?.subjects, user?.examDates])
 
   const grouped = events.reduce<Record<string, ScheduleEvent[]>>((acc, event) => {
     const key = `${event.day} · ${event.date}`
@@ -138,7 +154,7 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
       const response = await fetch(`${bffUrl}/api/semesters/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: 'student-anne-demo' }),
+        body: JSON.stringify({ studentId: user?.id || 'student-anne-demo' }),
       })
       if (response.ok) {
         setClosedSuccess(true)
@@ -153,72 +169,91 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
-      {/* Schedule list */}
+      {/* Lista do Cronograma */}
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle>Plano de estudos</CardTitle>
+          <CardTitle>Seu Plano de Estudos Personalizado</CardTitle>
           <CardDescription>
-            Cronograma montado pela Anne com base nas suas provas e no seu desempenho. Marque itens
-            conforme os conclui.
+            Cronograma montado pela Anne com base nas suas matérias, provas e metas de estudo.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
-          {Object.entries(grouped).map(([label, dayEvents]) => (
-            <div key={label}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {label}
-              </p>
-              <div className="flex flex-col gap-2">
-                {dayEvents.map((event) => {
-                  const meta = typeMeta[event.type]
-                  const Icon = meta.icon
-                  return (
-                    <label
-                      key={event.id}
-                      className={cn(
-                        'flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50',
-                        event.done && 'opacity-60',
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={event.done}
-                        onChange={() => toggleDone(event.id)}
-                        className="size-4 shrink-0 accent-primary"
-                      />
-                      <span
+          {events.length === 0 ? (
+            <div className="flex flex-col items-center justify-center p-8 text-center rounded-xl border border-dashed border-border bg-muted/20 space-y-4">
+              <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <CalendarClock className="size-6" />
+              </span>
+              <div className="space-y-1">
+                <h3 className="font-semibold text-foreground text-sm">Sem Cronograma Configurado</h3>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Você ainda não cadastrou suas matérias ou provas. Acesse seu perfil para configurar suas disciplinas ou envie uma foto/arquivo do seu cronograma com a IA!
+                </p>
+              </div>
+              {onNavigateToProfile && (
+                <Button onClick={onNavigateToProfile} className="gap-2 rounded-xl text-xs">
+                  <Sparkles className="size-4" />
+                  Configurar Perfil & Cronograma
+                </Button>
+              )}
+            </div>
+          ) : (
+            Object.entries(grouped).map(([label, dayEvents]) => (
+              <div key={label}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {label}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {dayEvents.map((event) => {
+                    const meta = typeMeta[event.type]
+                    const Icon = meta.icon
+                    return (
+                      <label
+                        key={event.id}
                         className={cn(
-                          'flex size-9 shrink-0 items-center justify-center rounded-lg',
-                          meta.className,
+                          'flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50',
+                          event.done && 'opacity-60',
                         )}
                       >
-                        <Icon className="size-4.5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p
+                        <input
+                          type="checkbox"
+                          checked={event.done}
+                          onChange={() => toggleDone(event.id)}
+                          className="size-4 shrink-0 accent-primary"
+                        />
+                        <span
                           className={cn(
-                            'truncate text-sm font-medium leading-tight',
-                            event.done && 'line-through',
+                            'flex size-9 shrink-0 items-center justify-center rounded-lg',
+                            meta.className,
                           )}
                         >
-                          {event.title}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">{event.subject}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <span className="text-xs font-medium">{event.time}</span>
-                        <Badge variant="neutral">{meta.label}</Badge>
-                      </div>
-                    </label>
-                  )
-                })}
+                          <Icon className="size-4.5" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={cn(
+                              'truncate text-sm font-medium leading-tight',
+                              event.done && 'line-through',
+                            )}
+                          >
+                            {event.title}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">{event.subject}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="text-xs font-medium">{event.time}</span>
+                          <Badge variant="neutral">{meta.label}</Badge>
+                        </div>
+                      </label>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
 
-      {/* Side cards: Notifications & Semester Cleanup */}
+      {/* Cards Laterais: Notificações & Encerramento do Semestre */}
       <div className="flex flex-col gap-6">
         <Card className="h-fit">
           <CardHeader>

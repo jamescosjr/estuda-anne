@@ -3,6 +3,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { getApiUrl } from '@/lib/api-config'
 
+export interface ExamDateItem {
+  id: string
+  subject: string
+  title: string
+  date: string
+}
+
 export interface User {
   id: string
   name: string
@@ -10,6 +17,9 @@ export interface User {
   role: 'ADMIN' | 'STUDENT'
   course?: string
   period?: string
+  periodStartDate?: string
+  periodEndDate?: string
+  examDates?: ExamDateItem[]
   subjects?: string[]
   studyGoalMinutes?: number
   isProfileComplete?: boolean
@@ -26,6 +36,9 @@ interface AuthContextType {
     name?: string
     course?: string
     period?: string
+    periodStartDate?: string
+    periodEndDate?: string
+    examDates?: ExamDateItem[]
     subjects?: string[]
     studyGoalMinutes?: number
   }) => Promise<{ success: boolean; error?: string }>
@@ -44,6 +57,9 @@ export const DEMO_STUDENT: User = {
   role: 'STUDENT',
   course: '',
   period: '',
+  periodStartDate: '',
+  periodEndDate: '',
+  examDates: [],
   subjects: [],
   studyGoalMinutes: 45,
   isProfileComplete: false,
@@ -56,6 +72,9 @@ export const DEMO_ADMIN: User = {
   role: 'ADMIN',
   course: 'Gestão da Plataforma',
   period: 'Administrador Master',
+  periodStartDate: '',
+  periodEndDate: '',
+  examDates: [],
   subjects: [],
   studyGoalMinutes: 60,
   isProfileComplete: true,
@@ -118,6 +137,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userRole,
         course: data.user.course || (userRole === 'ADMIN' ? 'Gestão da Plataforma' : ''),
         period: data.user.period || (userRole === 'ADMIN' ? 'Administrador Master' : ''),
+        periodStartDate: data.user.periodStartDate || '',
+        periodEndDate: data.user.periodEndDate || '',
+        examDates: data.user.examDates || [],
         subjects: data.user.subjects || [],
         studyGoalMinutes: data.user.studyGoalMinutes || 45,
         isProfileComplete: userRole === 'ADMIN' ? true : Boolean(data.user.course && data.user.period),
@@ -138,6 +160,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     name?: string
     course?: string
     period?: string
+    periodStartDate?: string
+    periodEndDate?: string
+    examDates?: ExamDateItem[]
     subjects?: string[]
     studyGoalMinutes?: number
   }): Promise<{ success: boolean; error?: string }> {
@@ -148,6 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: profileData.name !== undefined ? profileData.name : user.name,
       course: profileData.course !== undefined ? profileData.course : user.course,
       period: profileData.period !== undefined ? profileData.period : user.period,
+      periodStartDate: profileData.periodStartDate !== undefined ? profileData.periodStartDate : user.periodStartDate,
+      periodEndDate: profileData.periodEndDate !== undefined ? profileData.periodEndDate : user.periodEndDate,
+      examDates: profileData.examDates !== undefined ? profileData.examDates : user.examDates,
       subjects: profileData.subjects !== undefined ? profileData.subjects : user.subjects,
       studyGoalMinutes: profileData.studyGoalMinutes !== undefined ? profileData.studyGoalMinutes : user.studyGoalMinutes,
       isProfileComplete: Boolean(
