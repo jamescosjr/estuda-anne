@@ -10,6 +10,7 @@ import {
   Presentation,
   XCircle,
   FolderOpen,
+  Trash2,
 } from 'lucide-react'
 import { type UploadItem } from '@/lib/mock-data'
 import { Badge } from '@/components/ui/badge'
@@ -101,6 +102,18 @@ export function Materials() {
     } catch {
       // Ignora erro
     }
+  }
+
+  async function handleDelete(id: string) {
+    try {
+      await fetch(`${bffUrl}/api/materials/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+    } catch (err) {
+      console.warn('Erro ao deletar material no servidor:', err)
+    }
+    const updated = uploads.filter((item) => item.id !== id)
+    saveItems(updated)
   }
 
   async function handleFiles(files: File[]) {
@@ -251,6 +264,14 @@ export function Materials() {
                     </p>
                   </div>
                   <StatusBadge status={item.status} />
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(item.id)}
+                    className="flex size-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    title="Remover material"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
               )
             })

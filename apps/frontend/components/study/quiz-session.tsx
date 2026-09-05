@@ -50,18 +50,24 @@ const subjectQuestionTemplates: Record<string, { prompt: string; options: { id: 
   ],
 }
 
-function generateAcademicQuizzes(subjects: string[]): QuizQuestion[] {
-  if (!subjects || subjects.length === 0) return []
+function generateAcademicQuizzes(subjects: string[], targetCount = 5, subjectFilter = 'all'): QuizQuestion[] {
+  const selectedSubjects = (!subjects || subjects.length === 0)
+    ? ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+    : (subjectFilter !== 'all' ? [subjectFilter] : subjects)
 
   const list: QuizQuestion[] = []
-  subjects.forEach((sub, idx) => {
+  let idx = 0
+
+  while (list.length < targetCount) {
+    const sub = selectedSubjects[idx % selectedSubjects.length]
     const lowerSub = sub.toLowerCase()
     const matchKey = Object.keys(subjectQuestionTemplates).find((k) => lowerSub.includes(k))
+    const itemNum = Math.floor(list.length / selectedSubjects.length) + 1
 
-    if (matchKey && subjectQuestionTemplates[matchKey][0]) {
+    if (matchKey && subjectQuestionTemplates[matchKey][0] && itemNum === 1) {
       const template = subjectQuestionTemplates[matchKey][0]
       list.push({
-        id: `qz-${sub}-${idx}`,
+        id: `qz-${sub}-${list.length}`,
         subject: sub,
         prompt: template.prompt,
         options: template.options,
@@ -70,20 +76,22 @@ function generateAcademicQuizzes(subjects: string[]): QuizQuestion[] {
       })
     } else {
       list.push({
-        id: `qz-gen-${sub}-${idx}`,
+        id: `qz-gen-${sub}-${list.length}`,
         subject: sub,
-        prompt: `Sobre os fundamentos acadêmicos da disciplina de ${sub}, assinale a alternativa com a proposição teórica correta:`,
+        prompt: `[Questão Extra ${list.length + 1} / ${targetCount}] Sobre os tópicos avançados de ${sub}, analise as afirmativas:`,
         options: [
-          { id: 'a', text: `Os conceitos fundamentais de ${sub} estabelecem modelos analíticos para solução de problemas práticos.` },
-          { id: 'b', text: `A disciplina aborda apenas definições empíricas sem aplicação de métodos formais.` },
-          { id: 'c', text: `As hipóteses teóricas de ${sub} dependem exclusivamente de aproximações intuitivas.` },
-          { id: 'd', text: `Não há correlação entre as teorias de ${sub} e os testes do semestre.` },
+          { id: 'a', text: `A aplicação rigorosa das propriedades de ${sub} garante eficiência em exames práticos.` },
+          { id: 'b', text: `Os teoremas fundamentais de ${sub} são aplicáveis apenas a casos particulares sem generalização.` },
+          { id: 'c', text: `Não é possível derivar modelos preditivos a partir dos axiomas de ${sub}.` },
+          { id: 'd', text: `Todas as proposições acima estão incorretas.` },
         ],
         correctId: 'a',
-        explanation: `Na disciplina de ${sub}, a compreensão dos modelos teóricos e práticos consolida a base conceitual exigida nas avaliações universitárias.`,
+        explanation: `A resolução sistemática dos conceitos de ${sub} fortalece o aprendizado ativo e a retenção em avaliações universitárias.`,
       })
     }
-  })
+    idx++
+  }
+
   return list
 }
 
@@ -91,33 +99,21 @@ export function QuizSession() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
   const [current, setCurrent] = useState(0)
+  const [targetCount, setTargetCount] = useState<number>(5)
+  const [subjectFilter, setSubjectFilter] = useState<string>('all')
+
+  const availableSubjects = user?.subjects && user.subjects.length > 0
+    ? user.subjects
+    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 
   useEffect(() => {
-    if (user?.subjects && user.subjects.length > 0) {
-      setQuestions(generateAcademicQuizzes(user.subjects))
-    } else {
-      setQuestions([])
-    }
-  }, [user?.subjects])
+    setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
+    setCurrent(0)
+  }, [availableSubjects, targetCount, subjectFilter])
 
-  if (questions.length === 0) {
-    return (
-      <div className="mx-auto flex w-full max-w-xl flex-col items-center justify-center pt-8">
-        <Card className="w-full border-border shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <HelpCircle className="size-7" />
-            </span>
-            <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
-              Nenhum Quiz Gerado no Momento
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              Você ainda não possui quizzes ativos. Cadastre suas disciplinas no seu <strong className="text-foreground">Perfil</strong> ou envie uma apostila na <strong className="text-foreground">Central de Materiais</strong> para que a IA gere seus testes automaticamente!
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
+  function handleStartExtraSession() {
+    setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
+    setCurrent(0)
   }
 
   const total = questions.length
@@ -125,24 +121,73 @@ export function QuizSession() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <div>
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium">Quiz — {question.subject}</span>
-          <span className="text-muted-foreground">
-            {Math.round(((current + 1) / total) * 100)}% concluído
-          </span>
-        </div>
-        <Progress value={((current + 1) / total) * 100} />
-      </div>
+      {/* Control Toolbar: Estudo Sob Demanda (Fora do Horário) */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Estudo Extra — Fora do Horário</p>
+              <p className="text-xs text-muted-foreground">Escolha a quantidade de questões e matéria para treinar livremente</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-background text-xs px-2.5 py-1 text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">Todas as Matérias</option>
+              {availableSubjects.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
 
-      <QuizCard
-        key={question.id}
-        question={question}
-        index={current}
-        total={total}
-        isLast={current === total - 1}
-        onNext={() => setCurrent((c) => Math.min(c + 1, total - 1))}
-      />
+            <select
+              value={targetCount}
+              onChange={(e) => setTargetCount(Number(e.target.value))}
+              className="h-8 rounded-lg border border-border bg-background text-xs px-2.5 py-1 text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value={5}>5 Questões</option>
+              <option value={10}>10 Questões</option>
+              <option value={15}>15 Questões</option>
+              <option value={20}>20 Questões</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={handleStartExtraSession}
+              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+            >
+              <BookOpen className="size-3.5" />
+              Gerar Sessão Extra
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {total > 0 && question && (
+        <>
+          <div>
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-medium">Quiz ({current + 1} de {total}) — {question.subject}</span>
+              <span className="text-muted-foreground">
+                {Math.round(((current + 1) / total) * 100)}% concluído
+              </span>
+            </div>
+            <Progress value={((current + 1) / total) * 100} />
+          </div>
+
+          <QuizCard
+            key={question.id}
+            question={question}
+            index={current}
+            total={total}
+            isLast={current === total - 1}
+            onNext={() => setCurrent((c) => Math.min(c + 1, total - 1))}
+          />
+        </>
+      )}
     </div>
   )
 }

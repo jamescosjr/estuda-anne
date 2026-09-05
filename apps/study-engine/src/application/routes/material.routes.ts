@@ -13,4 +13,5 @@ export async function materialRoutes(
   app.get('', (req, reply) => controller.getByStudentId(req, reply));
   app.get('/:id', (req, reply) => controller.getById(req, reply));
   app.post('/:id/process', (req, reply) => controller.process(req, reply));
+  app.delete('/:id', (req, reply) => controller.delete(req, reply));
 }

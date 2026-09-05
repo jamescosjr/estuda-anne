@@ -31,31 +31,39 @@ const academicFlashcardTemplates: Record<string, { front: string; back: string }
   ],
 }
 
-function generateAcademicFlashcards(subjects: string[]): FlashcardItem[] {
-  if (!subjects || subjects.length === 0) return []
+function generateAcademicFlashcards(subjects: string[], targetCount = 5, subjectFilter = 'all'): FlashcardItem[] {
+  const selectedSubjects = (!subjects || subjects.length === 0)
+    ? ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+    : (subjectFilter !== 'all' ? [subjectFilter] : subjects)
 
   const list: FlashcardItem[] = []
-  subjects.forEach((sub, idx) => {
+  let idx = 0
+
+  while (list.length < targetCount) {
+    const sub = selectedSubjects[idx % selectedSubjects.length]
     const lowerSub = sub.toLowerCase()
     const matchKey = Object.keys(academicFlashcardTemplates).find((k) => lowerSub.includes(k))
+    const itemNum = Math.floor(list.length / selectedSubjects.length) + 1
 
-    if (matchKey && academicFlashcardTemplates[matchKey][0]) {
+    if (matchKey && academicFlashcardTemplates[matchKey][0] && itemNum === 1) {
       const template = academicFlashcardTemplates[matchKey][0]
       list.push({
-        id: `fc-${sub}-${idx}`,
+        id: `fc-${sub}-${list.length}`,
         subject: sub,
         front: template.front,
         back: template.back,
       })
     } else {
       list.push({
-        id: `fc-gen-${sub}-${idx}`,
+        id: `fc-gen-${sub}-${list.length}`,
         subject: sub,
-        front: `Qual é o conceito central abordado no primeiro módulo de ${sub}?`,
-        back: `Conceitos teóricos e fundamentais da disciplina de ${sub}, estabelecendo premissas analíticas e resoluções práticas para os exames.`,
+        front: `[Card Extra ${list.length + 1} / ${targetCount}] Qual a aplicação fundamental do conceito de ${sub}?`,
+        back: `O conceito em ${sub} permite estruturar raciocínios analíticos para resolução de problemas e otimização do tempo em avaliações acadêmicas.`,
       })
     }
-  })
+    idx++
+  }
+
   return list
 }
 
@@ -64,9 +72,14 @@ export function ReviewSession() {
   const [cards, setCards] = useState<FlashcardItem[]>([])
   const [current, setCurrent] = useState(0)
   const [done, setDone] = useState(false)
+  const [targetCount, setTargetCount] = useState<number>(5)
+  const [subjectFilter, setSubjectFilter] = useState<string>('all')
   const bffUrl = getApiUrl()
 
   const studentId = user?.id || 'guest-student'
+  const availableSubjects = user?.subjects && user.subjects.length > 0
+    ? user.subjects
+    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 
   useEffect(() => {
     async function loadDueCards() {
@@ -86,18 +99,20 @@ export function ReviewSession() {
           }
         }
       } catch (err) {
-        // Fallback local por matérias
+        // Fallback local
       }
 
-      if (user?.subjects && user.subjects.length > 0) {
-        setCards(generateAcademicFlashcards(user.subjects))
-      } else {
-        setCards([])
-      }
+      setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
     }
 
     loadDueCards()
-  }, [bffUrl, studentId, user?.subjects])
+  }, [bffUrl, studentId, availableSubjects, targetCount, subjectFilter])
+
+  function handleStartExtraSession() {
+    setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
+    setCurrent(0)
+    setDone(false)
+  }
 
   async function handleGrade(difficulty: Difficulty) {
     const card = cards[current]
@@ -129,31 +144,11 @@ export function ReviewSession() {
     setDone(false)
   }
 
-  if (cards.length === 0) {
-    return (
-      <div className="mx-auto flex w-full max-w-xl flex-col items-center justify-center pt-8">
-        <Card className="w-full border-border shadow-sm">
-          <CardContent className="flex flex-col items-center justify-center p-8 text-center space-y-4">
-            <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <Layers className="size-7" />
-            </span>
-            <h2 className="font-display text-lg font-semibold tracking-tight text-foreground">
-              Sem Flashcards Pendentes
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-              Você não possui flashcards agendados para hoje. Cadastre suas matérias no <strong className="text-foreground">Perfil</strong> ou envie uma apostila na <strong className="text-foreground">Central de Materiais</strong> para gerar novos cartões!
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   const total = cards.length
 
   if (done) {
     return (
-      <div className="mx-auto w-full max-w-xl">
+      <div className="mx-auto w-full max-w-xl flex flex-col gap-5">
         <Card>
           <CardContent className="flex flex-col items-center gap-4 p-10 text-center">
             <span className="flex size-14 items-center justify-center rounded-2xl bg-[var(--success)]/12 text-[var(--success)]">
@@ -178,17 +173,66 @@ export function ReviewSession() {
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-5">
-      <div>
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span className="font-medium">Revisão espaçada</span>
-          <span className="text-muted-foreground">
-            Card {current + 1} de {total}
-          </span>
-        </div>
-        <Progress value={((current + 1) / total) * 100} />
-      </div>
+      {/* Toolbar Sob Demanda (Estudo Extra) */}
+      <Card className="border-primary/20 bg-primary/5">
+        <CardContent className="p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-5 text-primary" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Flashcards Extra — Fora do Horário</p>
+              <p className="text-xs text-muted-foreground">Escolha a quantidade de cartões e a matéria para praticar</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={subjectFilter}
+              onChange={(e) => setSubjectFilter(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-background text-xs px-2.5 py-1 text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value="all">Todas as Matérias</option>
+              {availableSubjects.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
 
-      <Flashcard key={cards[current].id} card={cards[current]} onGrade={handleGrade} />
+            <select
+              value={targetCount}
+              onChange={(e) => setTargetCount(Number(e.target.value))}
+              className="h-8 rounded-lg border border-border bg-background text-xs px-2.5 py-1 text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            >
+              <option value={5}>5 Flashcards</option>
+              <option value={10}>10 Flashcards</option>
+              <option value={15}>15 Flashcards</option>
+              <option value={20}>20 Flashcards</option>
+            </select>
+
+            <button
+              type="button"
+              onClick={handleStartExtraSession}
+              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+            >
+              <BookOpen className="size-3.5" />
+              Gerar Sessão Extra
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {total > 0 && cards[current] && (
+        <>
+          <div>
+            <div className="mb-2 flex items-center justify-between text-sm">
+              <span className="font-medium">Revisão espaçada — {cards[current].subject}</span>
+              <span className="text-muted-foreground">
+                Card {current + 1} de {total}
+              </span>
+            </div>
+            <Progress value={((current + 1) / total) * 100} />
+          </div>
+
+          <Flashcard key={cards[current].id} card={cards[current]} onGrade={handleGrade} />
+        </>
+      )}
     </div>
   )
 }

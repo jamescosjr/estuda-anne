@@ -25,6 +25,30 @@ export async function studyRoutes(app: FastifyInstance) {
   app.get('/api/materials', getMaterialsHandler);
   app.get('/materials', getMaterialsHandler);
 
+  const deleteMaterialHandler = async (request: any, reply: any) => {
+    const { id } = request.params as any;
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/materials/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Erro ao deletar material' }));
+        return reply.status(res.status).send(errJson);
+      }
+      const data = await res.json();
+      return reply.status(200).send(data);
+    } catch (err: any) {
+      app.log.error({ err }, 'Erro ao deletar material no Study Engine');
+      return reply.status(500).send({
+        error: 'InternalServerError',
+        message: 'Falha ao deletar material: ' + (err.message || String(err)),
+      });
+    }
+  };
+
+  app.delete('/api/materials/:id', deleteMaterialHandler);
+  app.delete('/materials/:id', deleteMaterialHandler);
+
   // Rota de Upload de Material (Suporta PDF, PPT, Áudio, Vídeo e Imagens JPG/PNG/WebP)
   app.post('/api/materials/upload', async (request, reply) => {
     const body = request.body as any;

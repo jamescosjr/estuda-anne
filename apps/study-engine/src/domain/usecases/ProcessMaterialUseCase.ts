@@ -1,13 +1,17 @@
 import { Material } from '../entities/Material.js';
-import { Flashcard } from '../entities/Flashcard.js';
-import { Quiz } from '../entities/Quiz.js';
 import {
   IMaterialRepository,
   IFlashcardRepository,
   IQuizRepository,
   ILanguageModelService,
   ITranscriptionService,
+  IVectorRepository,
 } from '../ports/index.js';
+import { MaterialEvaluatorAgent } from '../services/pedagogical-agents/MaterialEvaluatorAgent.js';
+import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
+import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
+import { QualityGateAgent } from '../services/pedagogical-agents/QualityGateAgent.js';
+import { PedagogicalCoordinatorAgent } from '../services/pedagogical-agents/PedagogicalCoordinatorAgent.js';
 
 export interface ProcessMaterialInput {
   materialId: string;
@@ -23,13 +27,35 @@ export interface ProcessMaterialOutput {
 }
 
 export class ProcessMaterialUseCase {
+  private coordinatorAgent: PedagogicalCoordinatorAgent;
+
   constructor(
     private readonly materialRepository: IMaterialRepository,
     private readonly flashcardRepository: IFlashcardRepository,
     private readonly quizRepository: IQuizRepository,
     private readonly aiService: ILanguageModelService,
-    private readonly transcriptionService: ITranscriptionService
-  ) {}
+    private readonly transcriptionService: ITranscriptionService,
+    private readonly vectorRepository?: IVectorRepository
+  ) {
+    const dummyVectorRepo: IVectorRepository = vectorRepository || {
+      saveChunkEmbeddings: async () => {},
+      searchRelevantChunks: async () => [],
+      deleteEmbeddingsByMaterialIds: async () => {},
+      deleteEmbeddingsByStudentId: async () => {},
+    };
+
+    const evaluatorAgent = new MaterialEvaluatorAgent(this.aiService, dummyVectorRepo);
+    const flashcardAgent = new FlashcardSpecialistAgent(this.aiService, this.flashcardRepository);
+    const quizAgent = new QuizSpecialistAgent(this.aiService, this.quizRepository);
+    const qualityGateAgent = new QualityGateAgent();
+
+    this.coordinatorAgent = new PedagogicalCoordinatorAgent(
+      evaluatorAgent,
+      flashcardAgent,
+      quizAgent,
+      qualityGateAgent
+    );
+  }
 
   public async execute(input: ProcessMaterialInput): Promise<ProcessMaterialOutput> {
     const material = await this.materialRepository.findById(input.materialId);
@@ -40,7 +66,6 @@ export class ProcessMaterialUseCase {
     try {
       let rawText = material.rawContent;
 
-      // Se for áudio ou vídeo e ainda não tiver texto transcrito
       if (material.isAudioOrVideo() && !rawText) {
         material.startTranscription();
         await this.materialRepository.update(material);
@@ -59,49 +84,18 @@ export class ProcessMaterialUseCase {
       material.setRawContent(rawText);
       await this.materialRepository.update(material);
 
-      // Processamento inteligente com IA (Gemini Flash)
-      // 1. Extração de conceitos-chave e resumo estruturado
-      const analysis = await this.aiService.extractConceptsAndSummary(rawText);
-      material.completeProcessing(analysis.summary, analysis.keyConcepts);
+      // Execução orquestrada pelo PedagogicalCoordinatorAgent
+      const result = await this.coordinatorAgent.orchestrateProcessing(material, rawText);
+
       await this.materialRepository.update(material);
 
-      // 2. Geração automática de Flashcards
-      const generatedCards = await this.aiService.generateFlashcards(rawText, 5);
-      const flashcards = generatedCards.map(c =>
-        Flashcard.create({
-          studentId: material.studentId,
-          materialId: material.id,
-          front: c.front,
-          back: c.back,
-          tags: [...analysis.keyConcepts.slice(0, 3)],
-        })
-      );
-      if (flashcards.length > 0) {
-        await this.flashcardRepository.saveMany(flashcards);
-      }
-
-      // 3. Geração automática de Quiz
-      const quizQuestions = await this.aiService.generateQuizQuestions(rawText, 4);
-      let quizId: string | undefined;
-
-      if (quizQuestions.length > 0) {
-        const quiz = Quiz.create({
-          studentId: material.studentId,
-          materialId: material.id,
-          title: `Quiz: ${material.title}`,
-          questions: quizQuestions,
-        });
-        await this.quizRepository.save(quiz);
-        quizId = quiz.id;
-      }
-
       return {
-        materialId: material.id,
-        status: material.status,
-        summary: material.summary,
-        keyConcepts: material.keyConcepts,
-        generatedFlashcardsCount: flashcards.length,
-        generatedQuizId: quizId,
+        materialId: result.materialId,
+        status: result.status,
+        summary: result.summary,
+        keyConcepts: result.keyConcepts,
+        generatedFlashcardsCount: result.generatedFlashcardsCount,
+        generatedQuizId: result.generatedQuizId,
       };
     } catch (error: any) {
       material.markAsFailed(error.message || 'Unknown processing error');

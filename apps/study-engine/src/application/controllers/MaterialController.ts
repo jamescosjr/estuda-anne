@@ -3,11 +3,13 @@ import { CreateMaterialSchema, ProcessMaterialParamsSchema } from '../dto/materi
 import { Material } from '../../domain/entities/Material.js';
 import { IMaterialRepository } from '../../domain/ports/IMaterialRepository.js';
 import { ProcessMaterialUseCase } from '../../domain/usecases/ProcessMaterialUseCase.js';
+import { DeleteMaterialUseCase } from '../../domain/usecases/DeleteMaterialUseCase.js';
 
 export class MaterialController {
   constructor(
     private readonly materialRepository: IMaterialRepository,
-    private readonly processMaterialUseCase: ProcessMaterialUseCase
+    private readonly processMaterialUseCase: ProcessMaterialUseCase,
+    private readonly deleteMaterialUseCase?: DeleteMaterialUseCase
   ) {}
 
   public async create(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -48,5 +50,16 @@ export class MaterialController {
     const { studentId = 'anne-student-1' } = (request.query as { studentId?: string }) || {};
     const materials = await this.materialRepository.findByStudentId(studentId);
     reply.status(200).send(materials.map((m) => m.toJSON()));
+  }
+
+  public async delete(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { id } = ProcessMaterialParamsSchema.parse(request.params);
+    if (this.deleteMaterialUseCase) {
+      const result = await this.deleteMaterialUseCase.execute({ materialId: id });
+      reply.status(200).send(result);
+    } else {
+      await this.materialRepository.delete(id);
+      reply.status(200).send({ success: true, id });
+    }
   }
 }
