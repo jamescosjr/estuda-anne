@@ -3,20 +3,27 @@ import { FastifyInstance } from 'fastify';
 const STUDY_ENGINE_URL = process.env.STUDY_ENGINE_URL || 'http://localhost:3002';
 
 export async function studyRoutes(app: FastifyInstance) {
-  // Rota para listar materiais do estudante
-  app.get('/api/materials', async (request, reply) => {
+  const getMaterialsHandler = async (request: any, reply: any) => {
     const { studentId = 'anne-student-1' } = (request.query as any) || {};
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/materials?studentId=${encodeURIComponent(studentId)}`);
       if (!res.ok) {
+        if (res.status === 404) {
+          return reply.status(200).send([]);
+        }
         return reply.status(res.status).send(await res.json());
       }
       const data = await res.json();
       return reply.send(data);
     } catch (err: any) {
-      return reply.status(500).send({ error: 'InternalServerError', message: err.message });
+      app.log.warn({ err }, 'Study Engine offline, retornando lista vazia de materiais');
+      return reply.status(200).send([]);
     }
-  });
+  };
+
+  // Rota para listar materiais do estudante (Suporta /api/materials e /materials)
+  app.get('/api/materials', getMaterialsHandler);
+  app.get('/materials', getMaterialsHandler);
 
   // Rota de Upload de Material (Suporta PDF, PPT, Áudio, Vídeo e Imagens JPG/PNG/WebP)
   app.post('/api/materials/upload', async (request, reply) => {

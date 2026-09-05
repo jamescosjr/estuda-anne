@@ -13,7 +13,7 @@ const acceptedTypes = [
 ]
 
 interface UploadZoneProps {
-  onFiles?: (fileNames: string[]) => void
+  onFiles?: (files: File[]) => void
 }
 
 export function UploadZone({ onFiles }: UploadZoneProps) {
@@ -22,7 +22,7 @@ export function UploadZone({ onFiles }: UploadZoneProps) {
 
   function handleFiles(list: FileList | null) {
     if (!list || list.length === 0) return
-    onFiles?.(Array.from(list).map((f) => f.name))
+    onFiles?.(Array.from(list))
   }
 
   return (
@@ -76,7 +76,7 @@ export function UploadZone({ onFiles }: UploadZoneProps) {
           ref={inputRef}
           type="file"
           multiple
-          accept=".pdf,.pptx,.mp4,.mp3,.jpg,.jpeg,.png,.webp"
+          accept=".pdf,.pptx,.mp4,.mp3,.jpg,.jpeg,.png,.webp,.txt"
           className="sr-only"
           onChange={(e) => handleFiles(e.target.files)}
         />

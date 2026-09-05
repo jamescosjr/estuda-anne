@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, RotateCcw, Layers, Sparkles } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Layers } from 'lucide-react'
 import { type FlashcardItem } from '@/lib/mock-data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,17 +10,51 @@ import { Flashcard, type Difficulty } from './flashcard'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
 
-function generateUserFlashcards(subjects: string[]): FlashcardItem[] {
+const academicFlashcardTemplates: Record<string, { front: string; back: string }[]> = {
+  'cálculo': [
+    {
+      front: 'O que representa geometricamente a derivada de uma função f(x) em um ponto x₀?',
+      back: 'Representa a inclinação (ou coeficiente angular) da reta tangente ao gráfico da função f(x) no ponto (x₀, f(x₀)).',
+    },
+  ],
+  'bioquímica': [
+    {
+      front: 'O que caracteriza a estrutura secundária de uma proteína e quais são seus principais padrões?',
+      back: 'Caracteriza-se pelo arranjo espacial local da cadeia polipeptídica mantido por pontes de hidrogênio. Os dois principais padrões são a Alfa-Hélice e a Folha-Beta.',
+    },
+  ],
+  'algoritmos': [
+    {
+      front: 'Qual a principal diferença de funcionamento entre uma estrutura de dados Pilha (Stack) e uma Fila (Queue)?',
+      back: 'Pilha opera no sistema LIFO (Last In, First Out — o último elemento a entrar é o primeiro a sair). Fila opera no sistema FIFO (First In, First Out — o primeiro a entrar é o primeiro a sair).',
+    },
+  ],
+}
+
+function generateAcademicFlashcards(subjects: string[]): FlashcardItem[] {
   if (!subjects || subjects.length === 0) return []
 
   const list: FlashcardItem[] = []
   subjects.forEach((sub, idx) => {
-    list.push({
-      id: `fc-${sub}-${idx}-1`,
-      subject: sub,
-      front: `Qual é a melhor estratégia de estudo sugerida pela Anne para a disciplina de ${sub}?`,
-      back: `Fazer sessões diárias curtas (ex: 30 a 45 min) intercalando flashcards e leitura guiada para fixação profunda do conteúdo de ${sub}.`,
-    })
+    const lowerSub = sub.toLowerCase()
+    const matchKey = Object.keys(academicFlashcardTemplates).find((k) => lowerSub.includes(k))
+
+    if (matchKey && academicFlashcardTemplates[matchKey][0]) {
+      const template = academicFlashcardTemplates[matchKey][0]
+      list.push({
+        id: `fc-${sub}-${idx}`,
+        subject: sub,
+        front: template.front,
+        back: template.back,
+      })
+    } else {
+      list.push({
+        id: `fc-gen-${sub}-${idx}`,
+        subject: sub,
+        front: `Qual é o conceito central abordado no primeiro módulo de ${sub}?`,
+        back: `Conceitos teóricos e fundamentais da disciplina de ${sub}, estabelecendo premissas analíticas e resoluções práticas para os exames.`,
+      })
+    }
   })
   return list
 }
@@ -56,7 +90,7 @@ export function ReviewSession() {
       }
 
       if (user?.subjects && user.subjects.length > 0) {
-        setCards(generateUserFlashcards(user.subjects))
+        setCards(generateAcademicFlashcards(user.subjects))
       } else {
         setCards([])
       }

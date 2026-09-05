@@ -20,7 +20,7 @@ export interface BootstrapOptions {
 }
 
 export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, ignoreTrailingSlash: true });
 
   await app.register(cors, {
     origin: (origin, cb) => {

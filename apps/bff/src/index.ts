@@ -9,7 +9,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 export async function bootstrapBFF() {
-  const app = Fastify({ logger: true });
+  const app = Fastify({ logger: true, ignoreTrailingSlash: true });
 
   await app.register(cors, {
     origin: (origin, cb) => {
