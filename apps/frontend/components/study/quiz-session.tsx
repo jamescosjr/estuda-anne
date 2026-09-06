@@ -95,6 +95,8 @@ function generateAcademicQuizzes(subjects: string[], targetCount = 5, subjectFil
   return list
 }
 
+const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+
 export function QuizSession() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
@@ -102,14 +104,15 @@ export function QuizSession() {
   const [targetCount, setTargetCount] = useState<number>(5)
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
 
+  const userSubjectsKey = user?.subjects?.join(',') || ''
   const availableSubjects = user?.subjects && user.subjects.length > 0
     ? user.subjects
-    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+    : DEFAULT_SUBJECTS
 
   useEffect(() => {
     setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
     setCurrent(0)
-  }, [availableSubjects, targetCount, subjectFilter])
+  }, [userSubjectsKey, targetCount, subjectFilter])
 
   function handleStartExtraSession() {
     setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))

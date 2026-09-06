@@ -15,6 +15,11 @@ import { FlashcardController } from './application/controllers/FlashcardControll
 import { materialRoutes } from './application/routes/material.routes.js';
 import { flashcardRoutes } from './application/routes/flashcard.routes.js';
 
+import { MongoAIFeedbackRepository } from './infrastructure/persistence/mongo/repositories/MongoAIFeedbackRepository.js';
+import { SubmitAIFeedbackUseCase } from './domain/usecases/SubmitAIFeedbackUseCase.js';
+import { AIFeedbackController } from './application/controllers/AIFeedbackController.js';
+import { feedbackRoutes } from './application/routes/feedback.routes.js';
+
 export interface BootstrapOptions {
   connectMongo?: boolean;
 }
@@ -61,6 +66,7 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
       const materialRepo = new MongoMaterialRepository(db);
       const flashcardRepo = new MongoFlashcardRepository(db);
       const quizRepo = new MongoQuizRepository(db);
+      const feedbackRepo = new MongoAIFeedbackRepository(db);
 
       // Adaptadores de IA
       const geminiAdapter = new GeminiFlashAdapter();
@@ -76,14 +82,17 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
       );
       const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo);
       const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo);
+      const submitAIFeedbackUseCase = new SubmitAIFeedbackUseCase(feedbackRepo);
 
       // Controllers
       const materialController = new MaterialController(materialRepo, processMaterialUseCase);
       const flashcardController = new FlashcardController(reviewFlashcardUseCase, getDueFlashcardsUseCase);
+      const feedbackController = new AIFeedbackController(submitAIFeedbackUseCase, feedbackRepo);
 
       // Registro de Rotas
       await app.register(materialRoutes, { prefix: '/materials', controller: materialController });
       await app.register(flashcardRoutes, { prefix: '/flashcards', controller: flashcardController });
+      await app.register(feedbackRoutes, { controller: feedbackController });
     } catch (err) {
       app.log.warn({ err }, 'MongoDB connection skipped or failed during bootstrap. Running in degraded mode.');
     }

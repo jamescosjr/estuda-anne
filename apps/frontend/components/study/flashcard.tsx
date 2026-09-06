@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
+import { AIFeedbackButton } from './ai-feedback-button'
+
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
 interface FlashcardProps {
@@ -47,6 +49,9 @@ export function Flashcard({ card, onGrade }: FlashcardProps) {
               <p className="max-w-lg text-base leading-relaxed text-foreground/80 text-pretty">
                 {card.back}
               </p>
+              <div className="mt-4 flex justify-center">
+                <AIFeedbackButton targetType="flashcard" targetId={card.id} subject={card.subject} />
+              </div>
             </>
           )}
         </div>

@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
+import { AIFeedbackButton } from './ai-feedback-button'
+
 interface QuizCardProps {
   question: QuizQuestion
   index: number
@@ -100,27 +102,33 @@ export function QuizCard({ question, index, total, onNext, isLast }: QuizCardPro
 
         {/* Feedback area */}
         {confirmed && (
-          <div
-            className={cn(
-              'mt-5 rounded-xl border p-4',
-              isCorrect
-                ? 'border-[var(--success)]/40 bg-[var(--success)]/8'
-                : 'border-[var(--danger)]/40 bg-[var(--danger)]/8',
-            )}
-          >
-            <p
+          <div className="mt-5 flex flex-col gap-3">
+            <div
               className={cn(
-                'flex items-center gap-2 text-sm font-semibold',
-                isCorrect ? 'text-[var(--success)]' : 'text-[var(--danger)]',
+                'rounded-xl border p-4',
+                isCorrect
+                  ? 'border-[var(--success)]/40 bg-[var(--success)]/8'
+                  : 'border-[var(--danger)]/40 bg-[var(--danger)]/8',
               )}
             >
-              {isCorrect ? <Check className="size-4" /> : <X className="size-4" />}
-              {isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}
-            </p>
-            <p className="mt-2 text-sm leading-relaxed text-foreground/80 text-pretty">
-              <span className="font-medium text-foreground">Explicação da Anne: </span>
-              {question.explanation}
-            </p>
+              <p
+                className={cn(
+                  'flex items-center gap-2 text-sm font-semibold',
+                  isCorrect ? 'text-[var(--success)]' : 'text-[var(--danger)]',
+                )}
+              >
+                {isCorrect ? <Check className="size-4" /> : <X className="size-4" />}
+                {isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}
+              </p>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/80 text-pretty">
+                <span className="font-medium text-foreground">Explicação da Anne: </span>
+                {question.explanation}
+              </p>
+            </div>
+
+            <div className="flex justify-start">
+              <AIFeedbackButton targetType="quiz" targetId={question.id} subject={question.subject} />
+            </div>
           </div>
         )}
 

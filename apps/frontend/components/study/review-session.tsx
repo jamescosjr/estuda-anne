@@ -67,6 +67,8 @@ function generateAcademicFlashcards(subjects: string[], targetCount = 5, subject
   return list
 }
 
+const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+
 export function ReviewSession() {
   const { user } = useAuth()
   const [cards, setCards] = useState<FlashcardItem[]>([])
@@ -77,9 +79,10 @@ export function ReviewSession() {
   const bffUrl = getApiUrl()
 
   const studentId = user?.id || 'guest-student'
+  const userSubjectsKey = user?.subjects?.join(',') || ''
   const availableSubjects = user?.subjects && user.subjects.length > 0
     ? user.subjects
-    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+    : DEFAULT_SUBJECTS
 
   useEffect(() => {
     async function loadDueCards() {
@@ -106,7 +109,7 @@ export function ReviewSession() {
     }
 
     loadDueCards()
-  }, [bffUrl, studentId, availableSubjects, targetCount, subjectFilter])
+  }, [bffUrl, studentId, userSubjectsKey, targetCount, subjectFilter])
 
   function handleStartExtraSession() {
     setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))

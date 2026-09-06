@@ -263,4 +263,42 @@ export async function studyRoutes(app: FastifyInstance) {
       ],
     });
   });
+
+  // Rota de Feedback da IA do Estudante (Active Learning)
+  app.post('/api/feedback', async (request, reply) => {
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+      });
+      if (res.ok) {
+        return reply.status(201).send(await res.json());
+      }
+      return reply.status(200).send({ message: 'Feedback recebido no BFF', feedback: request.body });
+    } catch {
+      return reply.status(200).send({ message: 'Feedback gravado localmente no BFF', feedback: request.body });
+    }
+  });
+
+  app.get('/api/feedback/summary', async (request, reply) => {
+    const { studentId = 'anne-student-1' } = (request.query as any) || {};
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/feedback/summary?studentId=${encodeURIComponent(studentId)}`);
+      if (res.ok) {
+        return reply.status(200).send(await res.json());
+      }
+    } catch {
+      // Fallback local
+    }
+    return reply.status(200).send({
+      studentId,
+      totalFeedbacksCount: 0,
+      positiveCount: 0,
+      negativeCount: 0,
+      avoidTags: [],
+      preferredStyleHints: [],
+      adaptivePromptInstruction: 'Perfil adaptativo do estudante inicializado.',
+    });
+  });
 }

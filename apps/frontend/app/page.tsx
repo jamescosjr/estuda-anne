@@ -54,6 +54,26 @@ function MainAppShell() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // Restaurar aba persistida no F5 / reload a partir de window.location.hash ou localStorage
+  useEffect(() => {
+    function syncTabFromUrl() {
+      if (typeof window === 'undefined') return
+      const hash = window.location.hash.replace('#', '') as TabId
+      const stored = localStorage.getItem('estuda_anne_active_tab') as TabId
+      const validTabs: TabId[] = ['dashboard', 'materials', 'quiz', 'flashcards', 'schedule', 'profile', 'admin']
+
+      if (hash && validTabs.includes(hash)) {
+        setActiveTab(hash)
+      } else if (stored && validTabs.includes(stored)) {
+        setActiveTab(stored)
+      }
+    }
+
+    syncTabFromUrl()
+    window.addEventListener('hashchange', syncTabFromUrl)
+    return () => window.removeEventListener('hashchange', syncTabFromUrl)
+  }, [])
+
   // Proteção de rota e redirecionamento de onboarding de perfil
   useEffect(() => {
     if (user && user.role !== 'ADMIN') {
@@ -87,6 +107,10 @@ function MainAppShell() {
       return
     }
     setActiveTab(tab)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('estuda_anne_active_tab', tab)
+      window.location.hash = tab
+    }
     setMobileOpen(false)
   }
 
