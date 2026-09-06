@@ -14,9 +14,20 @@ export class QuizSpecialistAgent {
     materialTitle: string,
     rawText: string
   ): Promise<Quiz | null> {
-    const quizQuestions = await this.aiService.generateQuizQuestions(rawText, 4);
+    let quizQuestions = await this.aiService.generateQuizQuestions(rawText, 4);
 
     if (!quizQuestions || quizQuestions.length === 0) return null;
+
+    // Deduplicação estrita de questões
+    const seenPrompts = new Set<string>();
+    quizQuestions = quizQuestions.filter(q => {
+      const norm = q.prompt.trim().toLowerCase();
+      if (seenPrompts.has(norm)) return false;
+      seenPrompts.add(norm);
+      return true;
+    });
+
+    if (quizQuestions.length === 0) return null;
 
     const quiz = Quiz.create({
       studentId,

@@ -16,17 +16,65 @@ const academicFlashcardTemplates: Record<string, { front: string; back: string }
       front: 'O que representa geometricamente a derivada de uma função f(x) em um ponto x₀?',
       back: 'Representa a inclinação (ou coeficiente angular) da reta tangente ao gráfico da função f(x) no ponto (x₀, f(x₀)).',
     },
+    {
+      front: 'Qual é o enunciado fundamental do Teorema Fundamental do Cálculo?',
+      back: 'Conecta a derivação à integração, estabelecendo que se F é uma primitiva de f contínua em [a,b], então ∫_a^b f(x)dx = F(b) - F(a).',
+    },
+    {
+      front: 'O que é um ponto de inflexão no gráfico de uma função f(x)?',
+      back: 'É um ponto onde a concavidade do gráfico muda de sentido (onde a segunda derivada f\'\'(x) troca de sinal ou se anula).',
+    },
+    {
+      front: 'Como a regra de L\'Hôpital é aplicada no cálculo de limites?',
+      back: 'Para indeterminações do tipo 0/0 ou ∞/∞, o limite do quociente f(x)/g(x) é igual ao limite do quociente de suas derivadas f\'(x)/g\'(x).',
+    },
+    {
+      front: 'Qual a diferença entre integral definida e integral indefinida?',
+      back: 'Integral indefinida representa uma família de funções (primitivas com constante C); a integral definida resulta em um valor numérico que representa área líquida.',
+    },
   ],
   'bioquímica': [
     {
       front: 'O que caracteriza a estrutura secundária de uma proteína e quais são seus principais padrões?',
       back: 'Caracteriza-se pelo arranjo espacial local da cadeia polipeptídica mantido por pontes de hidrogênio. Os dois principais padrões são a Alfa-Hélice e a Folha-Beta.',
     },
+    {
+      front: 'O que é a modulação alostérica em enzimas?',
+      back: 'É a regulação da atividade enzimática pela ligação de um efetor em um sítio diferente do sítio ativo (sítio alostérico), alterando a conformação da enzima.',
+    },
+    {
+      front: 'Qual o papel funcional do ATP (Adenosina Trifosfato) no metabolismo?',
+      back: 'Atua como a "moeda energética" universal da célula, armazenando energia química em suas ligações anidro de fosfato de alta energia.',
+    },
+    {
+      front: 'Qual a diferença crucial entre fotossíntese e respiração celular?',
+      back: 'Fotossíntese sintetiza glicose e O₂ consumindo CO₂, H₂O e luz (anabolismo). Respiração oxidativa degrada glicose e O₂ gerando CO₂, H₂O e ATP (catabolismo).',
+    },
+    {
+      front: 'O que define a desnaturação proteica e quais fatores a provocam?',
+      back: 'É a perda da estrutura tridimensional nativa (terciária/secundária) sem quebrar ligações peptídicas, provocada por calor, pH extremo ou reagentes caotrópicos.',
+    },
   ],
   'algoritmos': [
     {
       front: 'Qual a principal diferença de funcionamento entre uma estrutura de dados Pilha (Stack) e uma Fila (Queue)?',
-      back: 'Pilha opera no sistema LIFO (Last In, First Out — o último elemento a entrar é o primeiro a sair). Fila opera no sistema FIFO (First In, First Out — o primeiro a entrar é o primeiro a sair).',
+      back: 'Pilha opera no sistema LIFO (Last In, First Out — o último a entrar é o primeiro a sair). Fila opera no sistema FIFO (First In, First Out — o primeiro a entrar é o primeiro a sair).',
+    },
+    {
+      front: 'O que define a técnica de programação chamada Divisão e Conquista?',
+      back: 'Dividir o problema em subproblemas menores do mesmo tipo, resolvê-los recursivamente e combinar suas soluções para resolver o problema original.',
+    },
+    {
+      front: 'Qual a vantagem da busca em Tabela Hash em relação à busca em Árvore Binária de Busca (BST)?',
+      back: 'A Tabela Hash busca em tempo médio constante O(1), enquanto a BST busca em tempo logarítmico O(log n).',
+    },
+    {
+      front: 'Em teoria da computação, o que caracteriza a classe de problemas NP-Completo?',
+      back: 'Problemas cuja solução pode ser verificada em tempo polinomial, mas para os quais não se conhece algoritmo polinomial de resolução.',
+    },
+    {
+      front: 'Qual a diferença entre algoritmos gulosos (Greedy) e Programação Dinâmica?',
+      back: 'Algoritmos gulosos tomam a escolha ótima local a cada passo sem rever decisões. Programação dinâmica resolve subproblemas sobrepostos armazenando os resultados.',
     },
   ],
 }
@@ -37,31 +85,46 @@ function generateAcademicFlashcards(subjects: string[], targetCount = 5, subject
     : (subjectFilter !== 'all' ? [subjectFilter] : subjects)
 
   const list: FlashcardItem[] = []
-  let idx = 0
+  const usedFronts = new Set<string>()
 
-  while (list.length < targetCount) {
-    const sub = selectedSubjects[idx % selectedSubjects.length]
+  // 1. Coleta cartões dos templates predefinidos
+  for (const sub of selectedSubjects) {
     const lowerSub = sub.toLowerCase()
     const matchKey = Object.keys(academicFlashcardTemplates).find((k) => lowerSub.includes(k))
-    const itemNum = Math.floor(list.length / selectedSubjects.length) + 1
+    if (matchKey && academicFlashcardTemplates[matchKey]) {
+      for (const t of academicFlashcardTemplates[matchKey]) {
+        if (!usedFronts.has(t.front.toLowerCase())) {
+          usedFronts.add(t.front.toLowerCase())
+          list.push({
+            id: `fc-${sub}-${list.length}`,
+            subject: sub,
+            front: t.front,
+            back: t.back,
+          })
+          if (list.length >= targetCount) break
+        }
+      }
+    }
+    if (list.length >= targetCount) break
+  }
 
-    if (matchKey && academicFlashcardTemplates[matchKey][0] && itemNum === 1) {
-      const template = academicFlashcardTemplates[matchKey][0]
-      list.push({
-        id: `fc-${sub}-${list.length}`,
-        subject: sub,
-        front: template.front,
-        back: template.back,
-      })
-    } else {
+  // 2. Se a quantidade solicitada for superior aos templates estáticos, gera cartões conceituais inéditos sem repetição
+  let fillIdx = 0
+  while (list.length < targetCount) {
+    const sub = selectedSubjects[fillIdx % selectedSubjects.length]
+    const cardNum = list.length + 1
+    const uniqueFront = `[Card de Revisão — ${sub} #${cardNum}] Quais são as aplicações práticas essenciais de ${sub} no aprendizado universitário?`
+
+    if (!usedFronts.has(uniqueFront.toLowerCase())) {
+      usedFronts.add(uniqueFront.toLowerCase())
       list.push({
         id: `fc-gen-${sub}-${list.length}`,
         subject: sub,
-        front: `[Card Extra ${list.length + 1} / ${targetCount}] Qual a aplicação fundamental do conceito de ${sub}?`,
-        back: `O conceito em ${sub} permite estruturar raciocínios analíticos para resolução de problemas e otimização do tempo em avaliações acadêmicas.`,
+        front: uniqueFront,
+        back: `A disciplina de ${sub} desenvolve o raciocínio analítico para resolução de problemas e consolidação de competências técnicas requeridas nos exames.`,
       })
     }
-    idx++
+    fillIdx++
   }
 
   return list

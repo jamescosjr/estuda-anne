@@ -16,7 +16,15 @@ export class FlashcardSpecialistAgent {
   ): Promise<Flashcard[]> {
     const generatedCards = await this.aiService.generateFlashcards(rawText, 5);
 
-    const flashcards = generatedCards.map((c) =>
+    const seenFronts = new Set<string>();
+    const uniqueCards = generatedCards.filter((c) => {
+      const norm = c.front.trim().toLowerCase();
+      if (seenFronts.has(norm)) return false;
+      seenFronts.add(norm);
+      return true;
+    });
+
+    const flashcards = uniqueCards.map((c) =>
       Flashcard.create({
         studentId,
         materialId,

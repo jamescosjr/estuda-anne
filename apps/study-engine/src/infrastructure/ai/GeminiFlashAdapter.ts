@@ -72,20 +72,43 @@ ${content.slice(0, 10000)}`;
 
   public async generateFlashcards(content: string, count = 5): Promise<GeneratedFlashcardDTO[]> {
     if (!this.apiKey) {
-      return [
+      const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
+      const cards: GeneratedFlashcardDTO[] = [];
+      const distinctTopics = Array.from(new Set(sentences));
+
+      for (let i = 0; i < Math.min(count, Math.max(3, distinctTopics.length)); i++) {
+        const topic = distinctTopics[i] || `Conceito fundamental ${i + 1}`;
+        cards.push({
+          front: `[Card ${i + 1}] Qual o significado e aplicação do tópico: "${topic.slice(0, 60)}..."?`,
+          back: `Representa o conceito-chave: ${topic}. Essencial para fixação e retenção no exame.`,
+        });
+      }
+
+      return cards.length > 0 ? cards : [
         {
-          front: 'Qual o conceito central abordado nesta lição?',
+          front: 'Qual o conceito central abordado neste material de estudo?',
           back: content.slice(0, 120).trim() + '...',
         },
         {
-          front: 'Defina a aplicação prática deste tópico para os exames da Anne.',
-          back: 'Consolidação de conceitos fundamentais com foco em resolução de questões práticas.',
+          front: 'Como aplicar os fundamentos teóricos em exercícios práticos?',
+          back: 'Relacionando os axiomas principais com resolução ativa de problemas e estudo espaçado.',
+        },
+        {
+          front: 'Qual a principal diferença entre os modelos apresentados no texto?',
+          back: 'A abrangência analítica e a eficiência na interpretação dos resultados em exames.',
         },
       ];
     }
 
-    const prompt = `Gere exatamente ${count} flashcards de alta qualidade no formato pergunta (front) e resposta objetiva (back) a partir do texto a seguir.
-Formato JSON esperado:
+    const prompt = `Você é um Engenheiro Pedagógico especialista em elaboração de exames universitários.
+Gere exatamente ${count} flashcards de alta qualidade pedagógica a partir do texto a seguir.
+
+REGRAS RÍGIDAS DE QUALIDADE:
+1. Cada flashcard deve abordar um tópico/aspecto TOTALMENTE DIFERENTE do texto (conceito, aplicação, definição, análise crítica).
+2. NUNCA repita enunciados, perguntas ou respostas.
+3. As perguntas (front) devem ser claras, profundas e objetivas. As respostas (back) devem ser completas e explicativas.
+
+Formato JSON estrito esperado:
 [{"front": "...", "back": "..."}]
 
 Texto:
@@ -114,23 +137,37 @@ ${content.slice(0, 10000)}`;
 
   public async generateQuizQuestions(content: string, questionsCount = 4): Promise<GeneratedQuizQuestionDTO[]> {
     if (!this.apiKey) {
-      return [
-        {
-          prompt: 'Com base no conteúdo estudado, qual a afirmação correta?',
+      const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
+      const questions: GeneratedQuizQuestionDTO[] = [];
+
+      for (let i = 0; i < questionsCount; i++) {
+        const sentence = sentences[i % sentences.length] || `tópico central de estudo número ${i + 1}`;
+        questions.push({
+          prompt: `Em relação ao trecho "${sentence.slice(0, 70)}...", assinale a alternativa correta:`,
           options: [
-            'O conceito requer revisão espaçada para retenção duradoura.',
-            'O material trata exclusivamente de memorização passiva.',
-            'Nenhuma das alternativas anteriores.',
-            'Apenas tópicos teóricos sem aplicação.',
+            `Trata-se do conceito principal referente a ${sentence.slice(0, 40)}.`,
+            `É uma exceção aplicável apenas em condições laboratoriais específicas.`,
+            `Representa um erro comum de interpretação que deve ser evitado.`,
+            `Nenhuma das alternativas anteriores está de acordo com a teoria.`,
           ],
           correctAnswerIndex: 0,
-          explanation: 'A revisão ativa e espaçada é cientificamente comprovada para fixação de longo prazo.',
-        },
-      ];
+          explanation: `A afirmação reflete o ponto correto: ${sentence}.`,
+        });
+      }
+
+      return questions;
     }
 
-    const prompt = `Gere ${questionsCount} questões de múltipla escolha para quiz com 4 opções cada, indicando o índice da resposta correta (0 a 3) e uma explicação didática para a estudante Anne.
-Formato JSON esperado:
+    const prompt = `Você é um Professor Universitário responsável por criar quizzes de avaliação para a aluna Anne.
+Gere exatamente ${questionsCount} questões de múltipla escolha inéditas a partir do conteúdo fornecido.
+
+REGRAS OBRIGATÓRIAS DE EXCELÊNCIA PEDAGÓGICA:
+1. Cada questão deve testar um conceito/tópico TOTALMENTE DIFERENTE.
+2. NUNCA gere perguntas repetidas ou com enunciados parecidos.
+3. Todas as 4 opções (0 a 3) em CADA questão devem ser ÚNICAS, plausíveis e bem formuladas. Sem opções óbvias ou idênticas.
+4. Indique o índice exato da resposta correta (correctAnswerIndex de 0 a 3) e uma explicação didática e encorajadora no campo "explanation".
+
+Formato JSON estrito esperado:
 [
   {
     "prompt": "...",
