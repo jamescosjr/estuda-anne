@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, RotateCcw, Layers } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Layers, Sparkles, BookOpen } from 'lucide-react'
 import { type FlashcardItem } from '@/lib/mock-data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
