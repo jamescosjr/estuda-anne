@@ -212,22 +212,24 @@ declare module 'fastify' {
   }
 }
 
-async function connectPersistenceWithRetry(app: FastifyInstance): Promise<void> {
+async function waitForMongo(app: FastifyInstance): Promise<void> {
+  const mongo = MongoConnection.getInstance();
   for (;;) {
     try {
-      await registerPersistenceRoutes(app);
-      app.log.info('Study Engine persistence routes registered');
+      await mongo.connect();
+      app.log.info('MongoDB connected');
       return;
     } catch (err) {
-      const code = err && typeof err === 'object' ? (err as { code?: string }).code : undefined;
-      if (code === 'AVV_ERR_ROOT_PLG_BOOTED') {
-        app.log.fatal({ err }, 'Rotas de persistencia nao podem ser registradas depois do listen');
-        throw err;
-      }
       app.log.error({ err }, 'MongoDB indisponivel; nova tentativa em 3s');
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
   }
+}
+
+async function connectPersistenceWithRetry(app: FastifyInstance): Promise<void> {
+  await waitForMongo(app);
+  await registerPersistenceRoutes(app);
+  app.log.info('Study Engine persistence routes registered');
 }
 
 if (process.env.NODE_ENV !== 'test') {
