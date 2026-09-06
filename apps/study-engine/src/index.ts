@@ -97,20 +97,11 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
     reply.header(CORRELATION_HEADER, correlationId);
   });
 
-  app.get('/health', async (_request, reply) => {
-    const mongoReady = Boolean(app.mongoReady);
-    if (!mongoReady) {
-      return reply.status(503).send({
-        service: 'estuda-anne-study-engine',
-        status: 'starting',
-        mongo: false,
-        timestamp: new Date().toISOString(),
-      });
-    }
+  app.get('/health', async () => {
     return {
       service: 'estuda-anne-study-engine',
       status: 'healthy',
-      mongo: true,
+      mongo: Boolean(app.mongoReady),
       timestamp: new Date().toISOString(),
     };
   });
