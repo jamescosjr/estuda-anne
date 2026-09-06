@@ -1,6 +1,15 @@
 import { MongoClient, Db } from 'mongodb';
 import { env } from '../../config/env.js';
 
+function databaseNameFromUri(uri: string): string {
+  try {
+    const pathname = new URL(uri).pathname.replace(/^\//, '').split('?')[0];
+    return pathname || 'estuda-anne';
+  } catch {
+    return 'estuda-anne';
+  }
+}
+
 export class MongoConnection {
   private static instance: MongoConnection | null = null;
   private client: MongoClient | null = null;
@@ -23,10 +32,10 @@ export class MongoConnection {
     this.client = new MongoClient(uri, {
       maxPoolSize: 10,
       minPoolSize: 1,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 15000,
     });
     await this.client.connect();
-    this.db = this.client.db('estuda-anne');
+    this.db = this.client.db(databaseNameFromUri(uri));
 
     if (!this.db) {
       throw new Error('Database connection failed');

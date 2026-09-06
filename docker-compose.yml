@@ -1,23 +1,20 @@
 version: '3.8'
 
 services:
-  # Banco de Dados MongoDB
+  # Mongo local opcional (dev): docker compose --profile local-db up
+  # Em produção o app usa só MONGODB_URI do .env (Atlas). Não subir este serviço.
   mongodb:
     image: mongo:7.0
     container_name: estuda-anne-mongo
     restart: always
+    profiles:
+      - local-db
     ports:
       - "27017:27017"
     environment:
       MONGO_INITDB_DATABASE: estuda-anne
     volumes:
       - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 15s
     networks:
       - estuda-anne-network
 
@@ -35,8 +32,6 @@ services:
     environment:
       - NODE_ENV=production
       - AUTH_SERVICE_PORT=3005
-    depends_on:
-      - mongodb
     networks:
       - estuda-anne-network
 
@@ -54,8 +49,6 @@ services:
     environment:
       - NODE_ENV=production
       - STUDY_ENGINE_PORT=3002
-    depends_on:
-      - mongodb
     networks:
       - estuda-anne-network
 
