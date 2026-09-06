@@ -5,4 +5,5 @@ export interface IStudyScheduleRepository {
   findById(id: string): Promise<StudySchedule | null>;
   findByStudentId(studentId: string): Promise<StudySchedule | null>;
   update(schedule: StudySchedule): Promise<void>;
+  deleteByStudentId(studentId: string): Promise<void>;
 }

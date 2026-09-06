@@ -19,6 +19,37 @@ import { UploadZone } from './upload-zone'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
 
+function mapMaterialStatus(status?: string): UploadItem['status'] {
+  if (status === 'READY' || status === 'PROCESSED' || status === 'DONE') return 'done'
+  if (status === 'FAILED') return 'failed'
+  return 'processing'
+}
+
+function mapFormatToKind(format?: string): UploadItem['kind'] {
+  const value = (format || '').toUpperCase()
+  if (value === 'PPT' || value === 'PPTX') return 'PPTX'
+  if (value === 'VIDEO' || value === 'MP4') return 'MP4'
+  if (value === 'AUDIO' || value === 'MP3') return 'MP3'
+  return 'PDF'
+}
+
+function mapBackendMaterial(m: any): UploadItem {
+  const status = mapMaterialStatus(m.status)
+  return {
+    id: m.id,
+    name: m.title,
+    kind: mapFormatToKind(m.format),
+    size: `${Math.round(((m.fileSizeBytes || 1048576) / 1024 / 1024) * 10) / 10} MB`,
+    status,
+    detail:
+      status === 'done'
+        ? 'Processado e indexado no RAG com IA'
+        : status === 'failed'
+          ? m.errorMessage || 'Falha no processamento'
+          : 'Processando com IA…',
+  }
+}
+
 const kindIcon = {
   PDF: FileText,
   PPTX: Presentation,
@@ -51,6 +82,20 @@ function StatusBadge({ status }: { status: UploadItem['status'] }) {
   )
 }
 
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  const bytes = new Uint8Array(buffer)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export function Materials() {
   const { user } = useAuth()
   const [uploads, setUploads] = useState<UploadItem[]>([])
@@ -76,14 +121,7 @@ export function Materials() {
         if (res.ok) {
           const list = await res.json()
           if (Array.isArray(list)) {
-            const mapped: UploadItem[] = list.map((m: any) => ({
-              id: m.id,
-              name: m.title,
-              kind: (m.format === 'PPTX' || m.format === 'MP4' || m.format === 'MP3') ? m.format : 'PDF',
-              size: `${Math.round((m.fileSizeBytes || 1048576) / 1024 / 1024 * 10) / 10} MB`,
-              status: (m.status === 'PROCESSED' || m.status === 'DONE') ? 'done' : m.status === 'FAILED' ? 'failed' : 'processing',
-              detail: m.status === 'PROCESSED' ? 'Processado e indexado no RAG com IA' : 'Registrado no banco de dados',
-            }))
+            const mapped: UploadItem[] = list.map(mapBackendMaterial)
             setUploads(mapped)
             localStorage.setItem(storageKey, JSON.stringify(mapped))
           }
@@ -149,17 +187,16 @@ export function Materials() {
       const itemMeta = newItems[i]
 
       let fileContent = ''
+      let fileBase64 = ''
       try {
         if (file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.md')) {
           fileContent = await file.text()
+        } else {
+          fileBase64 = await fileToBase64(file)
         }
       } catch {
         fileContent = ''
       }
-
-      const payloadContent = fileContent.trim().length > 10
-        ? fileContent
-        : `Apostila e notas da disciplina sobre ${file.name}. Conceitos fundamentais, fórmulas, definições teóricas e aplicações práticas.`
 
       try {
         const res = await fetch(`${bffUrl}/api/materials/upload`, {
@@ -170,36 +207,61 @@ export function Materials() {
             title: file.name,
             format: itemMeta.kind,
             mimeType: file.type || 'application/pdf',
-            content: payloadContent,
+            content: fileContent.trim().length > 10 ? fileContent : undefined,
+            fileBase64: fileBase64 || undefined,
+            fileSizeBytes: file.size || 1024,
           }),
         })
 
-        if (res.ok) {
+        if (res.ok || res.status === 202) {
           const data = await res.json()
-          const conceptCount = data.processResult?.keyConcepts?.length || 5
-          const flashcardCount = data.processResult?.flashcards?.length || 4
+          const serverId = data.material?.id || itemMeta.id
+          const mappedStatus = mapMaterialStatus(data.status || data.material?.status)
 
           setUploads((prev) => {
             const updated = prev.map((item) =>
               item.id === itemMeta.id
                 ? {
                     ...item,
-                    status: 'done' as const,
-                    detail: `Concluído: ${flashcardCount} flashcards e ${conceptCount} conceitos gerados via IA`,
+                    id: serverId,
+                    status: mappedStatus,
+                    detail: mappedStatus === 'done' ? 'Processado com IA' : mappedStatus === 'failed' ? (data.message || 'Falha no processamento') : 'Processando com IA…',
                   }
                 : item,
             )
             saveItems(updated)
             return updated
           })
+
+          if (mappedStatus === 'processing') {
+            for (let attempt = 0; attempt < 24; attempt += 1) {
+              await sleep(1500)
+              try {
+                const pollRes = await fetch(`${bffUrl}/api/materials/${encodeURIComponent(serverId)}`)
+                if (!pollRes.ok) continue
+                const polled = mapBackendMaterial(await pollRes.json())
+                setUploads((prev) => {
+                  const updated = prev.map((item) => (item.id === serverId || item.id === itemMeta.id ? { ...item, ...polled, id: serverId } : item))
+                  saveItems(updated)
+                  return updated
+                })
+                if (polled.status !== 'processing') break
+              } catch {
+                break
+              }
+            }
+          }
         } else {
+          const data = await res.json().catch(() => ({}))
+          const serverId = data.material?.id
           setUploads((prev) => {
             const updated = prev.map((item) =>
               item.id === itemMeta.id
                 ? {
                     ...item,
-                    status: 'done' as const,
-                    detail: `Concluído e processado no ambiente de estudos`,
+                    id: serverId || item.id,
+                    status: 'failed' as const,
+                    detail: data.message || 'Falha ao enviar ou processar o material',
                   }
                 : item,
             )
@@ -208,14 +270,13 @@ export function Materials() {
           })
         }
       } catch {
-        // Fallback gracioso para modo offline local
         setUploads((prev) => {
           const updated = prev.map((item) =>
             item.id === itemMeta.id
               ? {
                   ...item,
-                  status: 'done' as const,
-                  detail: `Concluído: 4 flashcards e 5 conceitos gerados via IA`,
+                  status: 'failed' as const,
+                  detail: 'Falha de conexão ao enviar o material',
                 }
               : item,
           )

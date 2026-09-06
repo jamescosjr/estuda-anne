@@ -15,6 +15,7 @@ describe('EvaluateQuizUseCase & Mecânica de Pesos Adaptativos', () => {
       findByMaterialId: vi.fn().mockResolvedValue([]),
       findByStudentId: vi.fn().mockResolvedValue([]),
       delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
     };
 
     mockProfileRepository = {

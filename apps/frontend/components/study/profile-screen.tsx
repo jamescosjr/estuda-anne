@@ -147,7 +147,7 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
 
       // Requisitar geração de cronograma no BFF com as novas datas
       const bffUrl = getApiUrl()
-      await fetch(`${bffUrl}/api/study/schedule/generate`, {
+      const scheduleRes = await fetch(`${bffUrl}/api/study/schedule/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -160,6 +160,11 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
           dailyStudyMinutesTarget: studyGoalMinutes,
         }),
       })
+
+      if (!scheduleRes.ok) {
+        alert('Perfil salvo, mas o cronograma não foi persistido. Tente salvar de novo em instantes.')
+        return
+      }
 
       setSuccessMessage(true)
       setTimeout(() => {

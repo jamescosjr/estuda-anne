@@ -13,7 +13,8 @@ export class QuizSpecialistAgent {
     studentId: string,
     materialTitle: string,
     rawText: string,
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    persist = true
   ): Promise<Quiz | null> {
     const existingQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
     const existingPrompts = existingQuizzes.flatMap(q => q.questions.map(item => item.prompt));
@@ -45,7 +46,15 @@ export class QuizSpecialistAgent {
       questions: quizQuestions,
     });
 
-    await this.quizRepository.save(quiz);
+    if (persist) {
+      await this.quizRepository.save(quiz);
+    }
     return quiz;
+  }
+
+  public async persistQuiz(quiz: Quiz | null): Promise<void> {
+    if (quiz) {
+      await this.quizRepository.save(quiz);
+    }
   }
 }

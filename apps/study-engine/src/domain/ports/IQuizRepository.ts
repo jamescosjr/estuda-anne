@@ -6,4 +6,5 @@ export interface IQuizRepository {
   findByMaterialId(materialId: string): Promise<Quiz[]>;
   findByStudentId(studentId: string): Promise<Quiz[]>;
   delete(id: string): Promise<void>;
+  deleteByStudentId(studentId: string): Promise<void>;
 }

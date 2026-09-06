@@ -13,6 +13,18 @@ export class MongoStudyScheduleRepository implements IStudyScheduleRepository {
 
   public async save(schedule: StudySchedule): Promise<void> {
     const doc = StudyScheduleMapper.toPersistence(schedule);
+    const existing = await this.collection.findOne(
+      { studentId: schedule.studentId },
+      { sort: { updatedAt: -1 } }
+    );
+
+    if (existing) {
+      doc._id = existing._id;
+      doc.createdAt = existing.createdAt;
+      await this.collection.replaceOne({ _id: existing._id }, doc);
+      return;
+    }
+
     await this.collection.insertOne(doc);
   }
 
@@ -23,7 +35,7 @@ export class MongoStudyScheduleRepository implements IStudyScheduleRepository {
   }
 
   public async findByStudentId(studentId: string): Promise<StudySchedule | null> {
-    const doc = await this.collection.findOne({ studentId });
+    const doc = await this.collection.findOne({ studentId }, { sort: { updatedAt: -1 } });
     if (!doc) return null;
     return StudyScheduleMapper.toDomain(doc);
   }
@@ -31,5 +43,10 @@ export class MongoStudyScheduleRepository implements IStudyScheduleRepository {
   public async update(schedule: StudySchedule): Promise<void> {
     const doc = StudyScheduleMapper.toPersistence(schedule);
     await this.collection.replaceOne({ _id: schedule.id }, doc, { upsert: true });
+  }
+
+  public async deleteByStudentId(studentId: string): Promise<void> {
+    if (!studentId) return;
+    await this.collection.deleteMany({ studentId });
   }
 }

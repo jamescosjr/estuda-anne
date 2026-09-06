@@ -135,6 +135,7 @@ const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas 
 export function ReviewSession() {
   const { user } = useAuth()
   const [cards, setCards] = useState<FlashcardItem[]>([])
+  const [usingDemo, setUsingDemo] = useState(false)
   const [current, setCurrent] = useState(0)
   const [done, setDone] = useState(false)
   const [targetCount, setTargetCount] = useState<number>(5)
@@ -161,6 +162,7 @@ export function ReviewSession() {
               back: fc.back,
             }))
             setCards(mapped)
+            setUsingDemo(false)
             return
           }
         }
@@ -168,6 +170,7 @@ export function ReviewSession() {
         // Fallback local
       }
 
+      setUsingDemo(true)
       setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
     }
 
@@ -175,6 +178,7 @@ export function ReviewSession() {
   }, [bffUrl, studentId, userSubjectsKey, targetCount, subjectFilter])
 
   function handleStartExtraSession() {
+    setUsingDemo(true)
     setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
     setCurrent(0)
     setDone(false)
@@ -192,7 +196,7 @@ export function ReviewSession() {
       await fetch(`${bffUrl}/api/flashcards/${card.id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating: ratingMap[difficulty] }),
+        body: JSON.stringify({ grade: ratingMap[difficulty], rating: ratingMap[difficulty] }),
       })
     } catch {
       // Ignora falhas de conexão em modo offline
@@ -283,6 +287,12 @@ export function ReviewSession() {
           </div>
         </CardContent>
       </Card>
+
+      {usingDemo && (
+        <p className="text-xs text-muted-foreground">
+          Demonstração: estes cards não vieram do seu material. Envie apostilas em Materiais para revisar o conteúdo persistido.
+        </p>
+      )}
 
       {total > 0 && cards[current] && (
         <>

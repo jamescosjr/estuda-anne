@@ -1,5 +1,6 @@
 import { ILanguageModelService, MaterialAnalysisResult } from '../../ports/ILanguageModelService.js';
 import { IVectorRepository } from '../../ports/IVectorRepository.js';
+import { lexicalEmbedding } from '../LexicalEmbedding.js';
 
 export class MaterialEvaluatorAgent {
   constructor(
@@ -27,7 +28,10 @@ export class MaterialEvaluatorAgent {
       await this.vectorRepository.saveChunkEmbeddings(
         materialId,
         studentId,
-        textChunks.map((chunk) => ({ textChunk: chunk }))
+        textChunks.map((chunk) => ({
+          textChunk: chunk,
+          embedding: lexicalEmbedding(chunk),
+        }))
       );
     }
 

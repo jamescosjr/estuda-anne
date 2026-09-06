@@ -28,8 +28,8 @@ export class MongoFlashcardRepository implements IFlashcardRepository {
     return FlashcardMapper.toDomain(doc);
   }
 
-  public async findByStudentId(studentId: string): Promise<Flashcard[]> {
-    const docs = await this.collection.find({ studentId }).toArray();
+  public async findByStudentId(studentId: string, limit = 200): Promise<Flashcard[]> {
+    const docs = await this.collection.find({ studentId }).limit(limit).toArray();
     return docs.map(FlashcardMapper.toDomain);
   }
 
@@ -58,5 +58,10 @@ export class MongoFlashcardRepository implements IFlashcardRepository {
 
   public async delete(id: string): Promise<void> {
     await this.collection.deleteOne({ _id: id });
+  }
+
+  public async deleteByStudentId(studentId: string): Promise<void> {
+    if (!studentId) return;
+    await this.collection.deleteMany({ studentId });
   }
 }

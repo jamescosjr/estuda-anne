@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
 import { QuizCard } from './quiz-card'
 import { useAuth } from '@/lib/auth-context'
+import { getApiUrl } from '@/lib/api-config'
 
 const subjectQuestionTemplates: Record<string, { prompt: string; options: { id: string; text: string }[]; correctId: string; explanation: string }[]> = {
   'cálculo': [
@@ -336,6 +337,7 @@ const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas 
 export function QuizSession() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [usingDemo, setUsingDemo] = useState(false)
   const [current, setCurrent] = useState(0)
   const [targetCount, setTargetCount] = useState<number>(5)
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
@@ -346,11 +348,45 @@ export function QuizSession() {
     : DEFAULT_SUBJECTS
 
   useEffect(() => {
-    setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
-    setCurrent(0)
-  }, [userSubjectsKey, targetCount, subjectFilter])
+    async function loadQuizzes() {
+      try {
+        const res = await fetch(`${getApiUrl()}/api/quizzes?studentId=${encodeURIComponent(user?.id || 'guest-student')}`)
+        if (res.ok) {
+          const list = await res.json()
+          if (Array.isArray(list) && list.length > 0) {
+            const mapped: QuizQuestion[] = list.flatMap((quiz: any) =>
+              (quiz.questions || []).map((question: any, idx: number) => ({
+                id: question.id || `${quiz.id}-${idx}`,
+                subject: quiz.title || 'Quiz',
+                prompt: question.prompt,
+                options: (question.options || []).map((text: string, optionIdx: number) => ({
+                  id: String(optionIdx),
+                  text,
+                })),
+                correctId: String(question.correctAnswerIndex ?? 0),
+                explanation: question.explanation || '',
+              })),
+            )
+            if (mapped.length > 0) {
+              setUsingDemo(false)
+              setQuestions(mapped.slice(0, targetCount))
+              setCurrent(0)
+              return
+            }
+          }
+        }
+      } catch {
+        // fallback demo
+      }
+      setUsingDemo(true)
+      setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
+      setCurrent(0)
+    }
+    loadQuizzes()
+  }, [userSubjectsKey, targetCount, subjectFilter, user?.id])
 
   function handleStartExtraSession() {
+    setUsingDemo(true)
     setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
     setCurrent(0)
   }
@@ -404,6 +440,12 @@ export function QuizSession() {
           </div>
         </CardContent>
       </Card>
+
+      {usingDemo && (
+        <p className="text-xs text-muted-foreground">
+          Demonstração: estas questões não vieram do seu material. Envie arquivos em Materiais para gerar quizzes persistidos.
+        </p>
+      )}
 
       {total > 0 && question && (
         <>

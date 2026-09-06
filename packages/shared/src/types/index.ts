@@ -1,6 +1,12 @@
-export type MaterialFormat = 'PDF' | 'PPT' | 'VIDEO' | 'AUDIO';
+export type MaterialFormat = 'PDF' | 'PPT' | 'VIDEO' | 'AUDIO' | 'IMAGE';
 
-export type ProcessingStatus = 'PENDING' | 'EXTRACTING' | 'AI_GENERATING' | 'READY' | 'FAILED';
+export type ProcessingStatus =
+  | 'PENDING'
+  | 'TRANSCRIBING'
+  | 'EXTRACTING'
+  | 'AI_GENERATING'
+  | 'READY'
+  | 'FAILED';
 
 export interface Flashcard {
   id: string;
@@ -29,9 +35,13 @@ export interface Quiz {
 
 export interface StudyScheduleItem {
   id: string;
-  studentId: string;
   date: Date;
+  dailyTargetMinutes?: number;
+  subject?: string;
+  topic?: string;
+  materialIds?: string[];
   flashcardIds: string[];
   quizIds: string[];
   completed: boolean;
+  completedAt?: Date;
 }

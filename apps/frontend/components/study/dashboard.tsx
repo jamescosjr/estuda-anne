@@ -1,6 +1,7 @@
 'use client'
 
-import { ArrowUpRight, BookOpen, CalendarClock, Clock, ListChecks, Sparkles, TrendingUp, FolderPlus, UserCheck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowUpRight, BookOpen, CalendarClock, Clock, ListChecks, Sparkles, TrendingUp, FolderPlus } from 'lucide-react'
 import { type TabId, type ScheduleEvent, type CourseProgress, type PendingReview } from '@/lib/mock-data'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/lib/auth-context'
 import { DailyBriefingCard } from './daily-briefing-card'
+import { getApiUrl } from '@/lib/api-config'
 
 const eventTypeLabels: Record<string, string> = {
   quiz: 'Quiz',
@@ -24,42 +26,101 @@ interface DashboardProps {
 
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { user } = useAuth()
-
   const subjects = user?.subjects || []
   const hasSubjects = subjects.length > 0
+  const [overall, setOverall] = useState(0)
+  const [userProgress, setUserProgress] = useState<CourseProgress[]>([])
+  const [userReviews, setUserReviews] = useState<PendingReview[]>([])
+  const [upcomingEvents, setUpcomingEvents] = useState<ScheduleEvent[]>([])
 
-  // Gera dados de progresso dinâmicos baseados estritamente nas matérias cadastradas pelo usuário
-  const userProgress: CourseProgress[] = subjects.map((sub, idx) => ({
-    id: `c-${sub}-${idx}`,
-    name: sub,
-    color: colorPalette[idx % colorPalette.length],
-    progress: Math.min(100, Math.max(10, (idx + 1) * 20)),
-    topics: 15,
-    reviewed: Math.min(15, (idx + 1) * 3),
-  }))
+  useEffect(() => {
+    const studentId = user?.id
+    if (!studentId) return
+    const bffUrl = getApiUrl()
 
-  const overall = hasSubjects
-    ? Math.round(userProgress.reduce((acc, c) => acc + c.progress, 0) / userProgress.length)
-    : 0
+    async function loadDashboard() {
+      try {
+        const [scheduleRes, dueRes] = await Promise.all([
+          fetch(`${bffUrl}/api/study/schedule?studentId=${encodeURIComponent(studentId)}`),
+          fetch(`${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`),
+        ])
 
-  const userReviews: PendingReview[] = subjects.slice(0, 3).map((sub, idx) => ({
-    id: `rev-${sub}-${idx}`,
-    subject: sub,
-    type: idx % 2 === 0 ? 'flashcards' : 'quiz',
-    count: 10 + idx * 5,
-    estimatedMinutes: 8 + idx * 4,
-  }))
+        let progressRows: CourseProgress[] = subjects.map((sub, idx) => ({
+          id: `c-${sub}-${idx}`,
+          name: sub,
+          color: colorPalette[idx % colorPalette.length],
+          progress: 0,
+          topics: 0,
+          reviewed: 0,
+        }))
+        let nextEvents: ScheduleEvent[] = []
+        let pct = 0
 
-  const upcomingEvents: ScheduleEvent[] = subjects.slice(0, 4).map((sub, idx) => ({
-    id: `dash-ev-${idx}`,
-    day: idx === 0 ? 'Hoje' : idx === 1 ? 'Amanhã' : 'Em breve',
-    date: idx === 0 ? 'Hoje' : 'Amanhã',
-    title: idx % 2 === 0 ? `Revisão de flashcards — ${sub}` : `Quiz gerado por IA — ${sub}`,
-    subject: sub,
-    type: idx % 2 === 0 ? 'flashcards' : 'quiz',
-    time: idx % 2 === 0 ? '18:00' : '20:30',
-    done: false,
-  }))
+        if (scheduleRes.ok) {
+          const schedule = await scheduleRes.json()
+          const items = Array.isArray(schedule.items) ? schedule.items : []
+          const completed = items.filter((item: any) => item.completed).length
+          pct = items.length ? Math.round((completed / items.length) * 100) : 0
+
+          progressRows = subjects.map((sub, idx) => {
+            const subjectItems = items.filter((item: any) => item.subject === sub)
+            const done = subjectItems.filter((item: any) => item.completed).length
+            return {
+              id: `c-${sub}-${idx}`,
+              name: sub,
+              color: colorPalette[idx % colorPalette.length],
+              progress: subjectItems.length ? Math.round((done / subjectItems.length) * 100) : 0,
+              topics: subjectItems.length,
+              reviewed: done,
+            }
+          })
+
+          nextEvents = items
+            .filter((item: any) => !item.completed)
+            .slice(0, 4)
+            .map((item: any) => {
+              const date = item.date ? new Date(item.date) : new Date()
+              return {
+                id: item.id,
+                day: date.toLocaleDateString('pt-BR', { weekday: 'short' }),
+                date: date.toLocaleDateString('pt-BR'),
+                title: item.topic || 'Sessão de estudos',
+                subject: item.subject || '',
+                type: item.quizIds?.length ? 'quiz' : item.flashcardIds?.length ? 'flashcards' : 'leitura',
+                time: '18:00',
+                done: false,
+              } as ScheduleEvent
+            })
+        }
+
+        const reviews: PendingReview[] = []
+        if (dueRes.ok) {
+          const due = await dueRes.json()
+          if (Array.isArray(due) && due.length > 0) {
+            reviews.push({
+              id: 'due-flashcards',
+              subject: 'Revisão espaçada',
+              type: 'flashcards',
+              count: due.length,
+              estimatedMinutes: Math.max(8, due.length * 2),
+            })
+          }
+        }
+
+        setOverall(pct)
+        setUserProgress(progressRows)
+        setUserReviews(reviews)
+        setUpcomingEvents(nextEvents)
+      } catch {
+        setOverall(0)
+        setUserProgress([])
+        setUserReviews([])
+        setUpcomingEvents([])
+      }
+    }
+
+    loadDashboard()
+  }, [user?.id, user?.subjects])
 
   return (
     <div className="flex flex-col gap-6">

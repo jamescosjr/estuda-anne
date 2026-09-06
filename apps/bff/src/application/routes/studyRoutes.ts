@@ -3,6 +3,15 @@ import { DailyBriefingListener } from '../listeners/DailyBriefingListener.js';
 
 const STUDY_ENGINE_URL = process.env.STUDY_ENGINE_URL || 'http://localhost:3002';
 
+function normalizeClientFormat(format: string): string {
+  const value = (format || '').toUpperCase();
+  if (value === 'PPTX') return 'PPT';
+  if (value === 'MP4') return 'VIDEO';
+  if (value === 'MP3') return 'AUDIO';
+  if (['JPG', 'JPEG', 'PNG', 'WEBP', 'IMAGE'].includes(value)) return 'IMAGE';
+  return value;
+}
+
 export async function studyRoutes(app: FastifyInstance) {
   const getMaterialsHandler = async (request: any, reply: any) => {
     const { studentId = 'anne-student-1' } = (request.query as any) || {};
@@ -17,8 +26,11 @@ export async function studyRoutes(app: FastifyInstance) {
       const data = await res.json();
       return reply.send(data);
     } catch (err: any) {
-      app.log.warn({ err }, 'Study Engine offline, retornando lista vazia de materiais');
-      return reply.status(200).send([]);
+      app.log.warn({ err }, 'Study Engine offline ao listar materiais');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao listar materiais no Study Engine',
+      });
     }
   };
 
@@ -50,10 +62,31 @@ export async function studyRoutes(app: FastifyInstance) {
   app.delete('/api/materials/:id', deleteMaterialHandler);
   app.delete('/materials/:id', deleteMaterialHandler);
 
+  const getMaterialByIdHandler = async (request: any, reply: any) => {
+    const { id } = request.params as any;
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/materials/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Material não encontrado' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      app.log.error({ err }, 'Erro ao consultar material no Study Engine');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao consultar material',
+      });
+    }
+  };
+
+  app.get('/api/materials/:id', getMaterialByIdHandler);
+  app.get('/materials/:id', getMaterialByIdHandler);
+
   // Rota de Upload de Material (Suporta PDF, PPT, Áudio, Vídeo e Imagens JPG/PNG/WebP)
   app.post('/api/materials/upload', async (request, reply) => {
     const body = request.body as any;
-    const { studentId = 'anne-student-1', title, format, mimeType = 'text/plain', fileUrl, content, fileSizeBytes = 1024 } = body || {};
+    const { studentId = 'anne-student-1', title, format, mimeType = 'text/plain', fileUrl, content, fileBase64, fileSizeBytes = 1024 } = body || {};
 
     if (!title || !format) {
       return reply.status(400).send({
@@ -70,10 +103,11 @@ export async function studyRoutes(app: FastifyInstance) {
         body: JSON.stringify({
           studentId,
           title,
-          format,
+          format: normalizeClientFormat(format),
           fileUrl: fileUrl || `https://r2.estuda-anne.local/${Date.now()}-${title}`,
           fileSizeBytes,
           mimeType,
+          rawContent: typeof content === 'string' && content.trim().length > 10 ? content : undefined,
         }),
       });
 
@@ -87,20 +121,43 @@ export async function studyRoutes(app: FastifyInstance) {
       // 2. Dispara o processamento com IA (Gemini 3.6 Flash) no Study Engine
       const processRes = await fetch(`${STUDY_ENGINE_URL}/materials/${material.id}/process`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ textContent: content }),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-correlation-id': String(request.headers['x-correlation-id'] || crypto.randomUUID()),
+        },
+        body: JSON.stringify({
+          textContent: typeof content === 'string' && content.trim().length > 10 ? content : undefined,
+          fileBase64,
+          mimeType,
+          fileName: title,
+          async: true,
+        }),
       });
 
-      let processResult = null;
-      if (processRes.ok) {
-        processResult = await processRes.json();
+      const processResult = await processRes.json().catch(() => null);
+      if (processRes.status === 202) {
+        return reply.status(202).send({
+          message: 'Material registrado. Processamento em andamento',
+          material: { ...material, status: 'PENDING' },
+          processResult,
+          status: 'PENDING',
+        });
       }
 
-      return reply.status(201).send({
-        message: 'Material registrado e processado com sucesso',
-        material,
-        processResult,
-        status: 'DONE',
+      if (processRes.ok) {
+        return reply.status(201).send({
+          message: 'Material registrado e processado com sucesso',
+          material: { ...material, status: processResult?.status || 'READY' },
+          processResult,
+          status: processResult?.status || 'READY',
+        });
+      }
+
+      return reply.status(422).send({
+        message: 'Material registrado, mas o processamento falhou',
+        material: { ...material, status: 'FAILED' },
+        processError: processResult,
+        status: 'FAILED',
       });
     } catch (err: any) {
       app.log.error({ err }, 'Erro ao comunicar com o Study Engine');
@@ -130,13 +187,14 @@ export async function studyRoutes(app: FastifyInstance) {
   // Rota para submeter nota de revisão de Flashcard (SM-2 Algorithm)
   app.post('/api/flashcards/:id/review', async (request, reply) => {
     const { id } = request.params as any;
-    const { rating } = request.body as any;
+    const { rating, grade } = request.body as any;
+    const sm2Grade = grade ?? rating;
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/${id}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rating }),
+        body: JSON.stringify({ grade: sm2Grade, rating: sm2Grade }),
       });
       if (!res.ok) {
         return reply.status(res.status).send(await res.json());
@@ -159,13 +217,26 @@ export async function studyRoutes(app: FastifyInstance) {
       });
     }
 
-    return reply.status(200).send({
-      message: 'Encerramento de semestre e rotina de cleanup concluídos com sucesso',
-      studentId,
-      deletedMaterialsCount: 0,
-      deletedStorageFilesCount: 0,
-      success: true,
-    });
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/semesters/close`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Erro ao encerrar semestre' }));
+        return reply.status(res.status).send(errJson);
+      }
+
+      return reply.status(200).send(await res.json());
+    } catch (err: any) {
+      app.log.error({ err }, 'Erro ao encerrar semestre no Study Engine');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao encerrar semestre',
+      });
+    }
   });
 
   // Rota para Gerar Cronograma Inteligente com IA com base nas matérias do estudante
@@ -193,28 +264,53 @@ export async function studyRoutes(app: FastifyInstance) {
         return reply.status(200).send(data);
       }
 
-      return reply.status(200).send({
-        studentId,
-        title,
-        subjects,
-        dailyStudyMinutesTarget,
-        periodStartDate,
-        periodEndDate,
-        examDates,
-        generatedAt: new Date().toISOString(),
-        message: 'Cronograma gerado com sucesso!',
-      });
+      const errJson = await res.json().catch(() => ({ message: 'Falha ao gerar cronograma' }));
+      return reply.status(res.status).send(errJson);
     } catch (err: any) {
-      app.log.warn({ err }, 'Study Engine offline, gerando resposta local no BFF');
-      return reply.status(200).send({
-        studentId,
-        title,
-        subjects,
-        dailyStudyMinutesTarget,
-        periodStartDate,
-        periodEndDate,
-        examDates,
-        generatedAt: new Date().toISOString(),
+      app.log.warn({ err }, 'Study Engine offline ao gerar cronograma');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao gerar cronograma no Study Engine',
+      });
+    }
+  });
+
+  app.get('/api/study/schedule', async (request, reply) => {
+    const { studentId = 'anne-student-1' } = (request.query as any) || {};
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/schedule?studentId=${encodeURIComponent(studentId)}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Cronograma não encontrado' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.status(200).send(await res.json());
+    } catch (err: any) {
+      app.log.warn({ err }, 'Study Engine offline ao carregar cronograma');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao carregar cronograma',
+      });
+    }
+  });
+
+  app.post('/api/study/schedule/items/:itemId/complete', async (request, reply) => {
+    const { itemId } = request.params as any;
+    const { studentId = 'anne-student-1' } = (request.body as any) || {};
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/schedule/items/${encodeURIComponent(itemId)}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao concluir item do plano' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.status(200).send(await res.json());
+    } catch (err: any) {
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao concluir item do plano',
       });
     }
   });
@@ -240,29 +336,16 @@ export async function studyRoutes(app: FastifyInstance) {
         const data = await res.json();
         return reply.status(200).send(data);
       }
+
+      const errJson = await res.json().catch(() => ({ message: 'Falha ao analisar arquivo de cronograma' }));
+      return reply.status(res.status).send(errJson);
     } catch (err: any) {
-      app.log.warn({ err }, 'Study Engine offline, utilizando fallback de análise local no BFF');
+      app.log.warn({ err }, 'Study Engine offline ao analisar arquivo de cronograma');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao analisar o arquivo. Preencha o cronograma manualmente.',
+      });
     }
-
-    // Fallback inteligente para offline / dev local
-    const now = new Date();
-    const startDate = now.toISOString().split('T')[0];
-    const endDate = new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-    return reply.status(200).send({
-      message: 'Arquivo de cronograma analisado com sucesso!',
-      periodStartDate: startDate,
-      periodEndDate: endDate,
-      subjects: ['Cálculo I', 'Algoritmos e Estruturas de Dados', 'Engenharia de Software'],
-      examDates: [
-        { id: `ex-1-${Date.now()}`, subject: 'Cálculo I', title: 'Prova P1 (Limites e Derivadas)', date: new Date(now.getTime() + 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-        { id: `ex-2-${Date.now()}`, subject: 'Algoritmos e Estruturas de Dados', title: 'Trabalho Prático 1', date: new Date(now.getTime() + 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-      ],
-      suggestedScheduleEvents: [
-        { id: `ev-1-${Date.now()}`, day: 'Seg', date: 'Próxima Seg', title: 'Revisão espaçada — Cálculo I', subject: 'Cálculo I', type: 'flashcards', time: '18:00', done: false },
-        { id: `ev-2-${Date.now()}`, day: 'Ter', date: 'Próxima Ter', title: 'Quiz de fixação — Algoritmos', subject: 'Algoritmos e Estruturas de Dados', type: 'quiz', time: '19:30', done: false },
-      ],
-    });
   });
 
   // Rota de Feedback da IA do Estudante (Active Learning)
@@ -276,9 +359,14 @@ export async function studyRoutes(app: FastifyInstance) {
       if (res.ok) {
         return reply.status(201).send(await res.json());
       }
-      return reply.status(200).send({ message: 'Feedback recebido no BFF', feedback: request.body });
-    } catch {
-      return reply.status(200).send({ message: 'Feedback gravado localmente no BFF', feedback: request.body });
+      const errJson = await res.json().catch(() => ({ message: 'Falha ao gravar feedback' }));
+      return reply.status(res.status).send(errJson);
+    } catch (err: any) {
+      app.log.warn({ err }, 'Study Engine offline ao gravar feedback');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao gravar feedback no Study Engine',
+      });
     }
   });
 
@@ -289,18 +377,15 @@ export async function studyRoutes(app: FastifyInstance) {
       if (res.ok) {
         return reply.status(200).send(await res.json());
       }
-    } catch {
-      // Fallback local
+      const errJson = await res.json().catch(() => ({ message: 'Falha ao consultar feedback' }));
+      return reply.status(res.status).send(errJson);
+    } catch (err: any) {
+      app.log.warn({ err }, 'Study Engine offline ao consultar feedback');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao consultar feedback',
+      });
     }
-    return reply.status(200).send({
-      studentId,
-      totalFeedbacksCount: 0,
-      positiveCount: 0,
-      negativeCount: 0,
-      avoidTags: [],
-      preferredStyleHints: [],
-      adaptivePromptInstruction: 'Perfil adaptativo do estudante inicializado.',
-    });
   });
 
   // Rota SSE de Streaming para o Briefing Diário de Boas-vindas Inteligente
@@ -368,6 +453,23 @@ Exemplo: "Oi Anne, bom dia! Vi que temos 15 flashcards de Cálculo pendentes par
     reply.raw.end();
   });
 
+  app.get('/api/quizzes', async (request, reply) => {
+    const { studentId = 'anne-student-1' } = request.query as any;
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/quizzes?studentId=${encodeURIComponent(studentId)}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao listar quizzes' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao listar quizzes',
+      });
+    }
+  });
+
   // Rota de Avaliação de Quiz com Recálculo de Pesos por Tópico e Diagnóstico Adaptativo
   app.post('/api/quizzes/:id/evaluate', async (request, reply) => {
     const { id } = request.params as any;
@@ -383,31 +485,15 @@ Exemplo: "Oi Anne, bom dia! Vi que temos 15 flashcards de Cálculo pendentes par
       if (res.ok) {
         return reply.status(200).send(await res.json());
       }
-    } catch {
-      // Fallback local em caso de desconexão
+
+      const errJson = await res.json().catch(() => ({ message: 'Falha ao avaliar quiz' }));
+      return reply.status(res.status).send(errJson);
+    } catch (err: any) {
+      app.log.warn({ err }, 'Study Engine offline ao avaliar quiz');
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao avaliar quiz no Study Engine',
+      });
     }
-
-    const totalQuestions = answers.length || 4;
-    const correctCount = answers.filter((a: any) => a.selectedOptionIndex === 0).length;
-    const scorePercentage = Math.round((correctCount / totalQuestions) * 100);
-
-    return reply.status(200).send({
-      quizId: id,
-      studentId,
-      totalQuestions,
-      correctCount,
-      scorePercentage,
-      adaptiveProfile: {
-        studentId,
-        adaptivePromptInstruction: scorePercentage < 75
-          ? 'Identificamos necessidade de reforço ativo nos tópicos com erro. O próximo quiz priorizará 60% desses conceitos.'
-          : 'Excelente desempenho! Mantenha revisões espaçadas contínuas.',
-        weakTopics: scorePercentage < 75 ? ['Conceitos Teóricos Avançados'] : [],
-        topicWeights: {
-          'Conceitos Teóricos': { correct: correctCount, wrong: totalQuestions - correctCount, priorityWeight: scorePercentage < 75 ? 2.2 : 1.0 },
-        },
-      },
-      evaluatedAt: new Date().toISOString(),
-    });
   });
 }

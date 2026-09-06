@@ -2,6 +2,8 @@ export interface StudyScheduleItemMongoDocument {
   id: string;
   date: Date;
   dailyTargetMinutes: number;
+  subject?: string;
+  topic?: string;
   materialIds: string[];
   flashcardIds: string[];
   quizIds: string[];

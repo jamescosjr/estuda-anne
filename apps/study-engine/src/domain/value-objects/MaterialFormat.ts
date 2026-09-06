@@ -11,3 +11,28 @@ export function isValidMaterialFormat(value: string): value is MaterialFormat {
 export function isSupportedImageMimeType(mimeType: string): boolean {
   return SUPPORTED_IMAGE_MIME_TYPES.includes(mimeType as typeof SUPPORTED_IMAGE_MIME_TYPES[number]);
 }
+
+export function normalizeMaterialFormat(value: string): MaterialFormat {
+  const normalized = value.trim().toUpperCase();
+  switch (normalized) {
+    case 'PDF':
+      return 'PDF';
+    case 'PPT':
+    case 'PPTX':
+      return 'PPT';
+    case 'VIDEO':
+    case 'MP4':
+      return 'VIDEO';
+    case 'AUDIO':
+    case 'MP3':
+      return 'AUDIO';
+    case 'IMAGE':
+    case 'JPG':
+    case 'JPEG':
+    case 'PNG':
+    case 'WEBP':
+      return 'IMAGE';
+    default:
+      throw new Error(`Unsupported material format: ${value}`);
+  }
+}

@@ -13,7 +13,8 @@ export class FlashcardSpecialistAgent {
     studentId: string,
     rawText: string,
     keyConcepts: readonly string[],
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    persist = true
   ): Promise<Flashcard[]> {
     const existingCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
     const existingFronts = existingCards.map(c => c.front);
@@ -43,10 +44,16 @@ export class FlashcardSpecialistAgent {
       })
     );
 
-    if (flashcards.length > 0) {
+    if (persist && flashcards.length > 0) {
       await this.flashcardRepository.saveMany(flashcards);
     }
 
     return flashcards;
+  }
+
+  public async persistFlashcards(flashcards: Flashcard[]): Promise<void> {
+    if (flashcards.length > 0) {
+      await this.flashcardRepository.saveMany(flashcards);
+    }
   }
 }

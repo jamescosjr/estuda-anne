@@ -88,10 +88,19 @@ export class MongoConnection {
         { name: 'idx_quizzes_student' }
       );
 
-      // 4. Study Schedules
+      // 4. Study Schedules — um plano ativo por aluna
       await this.db.collection('study_schedules').createIndex(
         { studentId: 1 },
-        { name: 'idx_schedules_student' }
+        { name: 'idx_schedules_active_student', unique: true }
+      );
+
+      await this.db.collection('material_embeddings').createIndex(
+        { materialId: 1 },
+        { name: 'idx_embeddings_material' }
+      );
+      await this.db.collection('material_embeddings').createIndex(
+        { studentId: 1 },
+        { name: 'idx_embeddings_student' }
       );
     } catch {
       // Continua se índices já existirem ou ambiente de teste

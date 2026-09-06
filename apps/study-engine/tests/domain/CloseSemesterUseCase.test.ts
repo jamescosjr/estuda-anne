@@ -50,7 +50,7 @@ describe('CloseSemesterUseCase', () => {
     expect(result.deletedMaterialsCount).toBe(0);
     expect(result.deletedStorageFilesCount).toBe(0);
     expect(storageProvider.deleteBatch).not.toHaveBeenCalled();
-    expect(vectorRepository.deleteEmbeddingsByMaterialIds).not.toHaveBeenCalled();
+    expect(vectorRepository.deleteEmbeddingsByStudentId).toHaveBeenCalledWith('student-123');
   });
 
   it('should delete storage files, RAG embeddings, and MongoDB records when closing semester', async () => {
@@ -81,7 +81,7 @@ describe('CloseSemesterUseCase', () => {
     expect(result.deletedStorageFilesCount).toBe(2);
 
     expect(storageProvider.deleteBatch).toHaveBeenCalledWith(['materials/mat-1.jpg', 'materials/mat-2.pdf']);
-    expect(vectorRepository.deleteEmbeddingsByMaterialIds).toHaveBeenCalledWith([mat1.id, mat2.id]);
+    expect(vectorRepository.deleteEmbeddingsByStudentId).toHaveBeenCalledWith('student-123');
     expect(materialRepository.deleteManyByIds).toHaveBeenCalledWith([mat1.id, mat2.id]);
   });
 });

@@ -6,6 +6,7 @@ import {
   ILanguageModelService,
   ITranscriptionService,
   IVectorRepository,
+  IContentExtractor,
 } from '../ports/index.js';
 import { MaterialEvaluatorAgent } from '../services/pedagogical-agents/MaterialEvaluatorAgent.js';
 import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
@@ -15,6 +16,11 @@ import { PedagogicalCoordinatorAgent } from '../services/pedagogical-agents/Peda
 
 export interface ProcessMaterialInput {
   materialId: string;
+  textContent?: string;
+  force?: boolean;
+  fileBase64?: string;
+  mimeType?: string;
+  fileName?: string;
 }
 
 export interface ProcessMaterialOutput {
@@ -35,7 +41,8 @@ export class ProcessMaterialUseCase {
     private readonly quizRepository: IQuizRepository,
     private readonly aiService: ILanguageModelService,
     private readonly transcriptionService: ITranscriptionService,
-    private readonly vectorRepository?: IVectorRepository
+    private readonly vectorRepository?: IVectorRepository,
+    private readonly contentExtractor?: IContentExtractor
   ) {
     const dummyVectorRepo: IVectorRepository = vectorRepository || {
       saveChunkEmbeddings: async () => {},
@@ -64,7 +71,30 @@ export class ProcessMaterialUseCase {
     }
 
     try {
-      let rawText = material.rawContent;
+      if (material.isReady() && !input.force) {
+        const existingCards = await this.flashcardRepository.findByMaterialId(material.id);
+        const existingQuizzes = await this.quizRepository.findByMaterialId(material.id);
+        return {
+          materialId: material.id,
+          status: material.status,
+          summary: material.summary,
+          keyConcepts: material.keyConcepts,
+          generatedFlashcardsCount: existingCards.length,
+          generatedQuizId: existingQuizzes[0]?.id,
+        };
+      }
+
+      let rawText = input.textContent?.trim() || material.rawContent;
+
+      if ((!rawText || rawText.trim().length === 0) && this.contentExtractor && input.fileBase64) {
+        material.startExtraction();
+        await this.materialRepository.update(material);
+        rawText = await this.contentExtractor.extractText({
+          fileBase64: input.fileBase64,
+          mimeType: input.mimeType || material.mimeType,
+          fileName: input.fileName || material.title,
+        });
+      }
 
       if (material.isAudioOrVideo() && !rawText) {
         material.startTranscription();

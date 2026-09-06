@@ -23,6 +23,7 @@ export type CreateMaterialProps = Omit<
   'id' | 'status' | 'keyConcepts' | 'createdAt' | 'updatedAt' | 'summary' | 'rawContent' | 'errorMessage' | 'processedAt'
 > & {
   id?: string;
+  rawContent?: string;
 };
 
 export class Material {
@@ -49,6 +50,7 @@ export class Material {
       id: props.id || crypto.randomUUID(),
       status: 'PENDING',
       keyConcepts: [],
+      rawContent: props.rawContent,
       createdAt: now,
       updatedAt: now,
     });
@@ -126,5 +128,10 @@ export class Material {
 
   public toJSON(): MaterialProps {
     return { ...this.props, keyConcepts: [...this.props.keyConcepts] };
+  }
+
+  public toListJSON(): Omit<MaterialProps, 'rawContent'> {
+    const { rawContent: _rawContent, ...rest } = this.toJSON();
+    return rest;
   }
 }

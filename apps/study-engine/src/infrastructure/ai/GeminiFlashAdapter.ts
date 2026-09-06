@@ -6,6 +6,33 @@ import {
   ParsedScheduleAnalysisResult,
 } from '../../domain/ports/ILanguageModelService.js';
 import { env } from '../config/env.js';
+import { logStructured } from '../observability/structuredLog.js';
+
+async function geminiFetch(url: string, init: RequestInit, operation = 'gemini_generate'): Promise<Response> {
+  const started = Date.now();
+  try {
+    const response = await fetch(url, init);
+    logStructured({
+      service: 'study-engine',
+      event: 'gemini_call',
+      operation,
+      status: response.status,
+      durationMs: Date.now() - started,
+      ok: response.ok,
+    });
+    return response;
+  } catch (error) {
+    logStructured({
+      service: 'study-engine',
+      event: 'gemini_call',
+      operation,
+      durationMs: Date.now() - started,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
+}
 
 export class GeminiFlashAdapter implements ILanguageModelService {
   private readonly apiKey: string | undefined;
@@ -44,7 +71,7 @@ Formato JSON esperado:
 Material:
 ${content.slice(0, 10000)}`;
 
-    const response = await fetch(
+    const response = await geminiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
       {
         method: 'POST',
@@ -139,7 +166,7 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
   }
 ]`;
 
-    const response = await fetch(
+    const response = await geminiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
       {
         method: 'POST',
@@ -223,7 +250,7 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
   }
 ]`;
 
-    const response = await fetch(
+    const response = await geminiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
       {
         method: 'POST',
@@ -312,7 +339,7 @@ Formato JSON estrito esperado:
     }
     parts.push({ text: prompt });
 
-    const response = await fetch(
+    const response = await geminiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
       {
         method: 'POST',
@@ -374,7 +401,7 @@ Instruções:
     }
 
     try {
-      const response = await fetch(
+      const response = await geminiFetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
         {
           method: 'POST',

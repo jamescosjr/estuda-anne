@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAuth, ExamDateItem } from '@/lib/auth-context'
+import { useAuth } from '@/lib/auth-context'
 import { getApiUrl } from '@/lib/api-config'
 
 const typeMeta: Record<
@@ -20,64 +20,30 @@ const typeMeta: Record<
   resumo: { label: 'Resumo', icon: NotebookPen, className: 'bg-chart-3/20 text-chart-3' },
 }
 
-function generateEventsForUser(subjects: string[], examDates?: ExamDateItem[]): ScheduleEvent[] {
-  if (!subjects || subjects.length === 0) return []
+function mapScheduleToEvents(schedule: any): ScheduleEvent[] {
+  if (!schedule?.items || !Array.isArray(schedule.items)) return []
 
-  const types: ScheduleEvent['type'][] = ['flashcards', 'quiz', 'leitura', 'resumo']
-  const days = [
-    { day: 'Hoje', date: 'Hoje' },
-    { day: 'Amanhã', date: 'Amanhã' },
-    { day: 'Sex', date: 'Sex' },
-    { day: 'Sáb', date: 'Sáb' },
-  ]
+  return schedule.items.map((item: any) => {
+    const date = item.date ? new Date(item.date) : new Date()
+    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'short' })
+    const dateLabel = date.toLocaleDateString('pt-BR')
+    const type: ScheduleEvent['type'] = item.quizIds?.length
+      ? 'quiz'
+      : item.flashcardIds?.length
+        ? 'flashcards'
+        : 'leitura'
 
-  const items: ScheduleEvent[] = []
-  let count = 1
-
-  // Adiciona revisões intensivas de exames/provas cadastrados
-  if (examDates && examDates.length > 0) {
-    examDates.forEach((ex) => {
-      items.push({
-        id: `exam-ev-${ex.id}`,
-        day: 'Prova em breve',
-        date: ex.date,
-        title: `Revisão Prioritária — ${ex.title}`,
-        subject: ex.subject,
-        type: 'flashcards',
-        time: '19:00',
-        done: false,
-      })
-    })
-  }
-
-  days.forEach((d, dayIdx) => {
-    const daySubjects = [
-      subjects[dayIdx % subjects.length],
-      subjects[(dayIdx + 1) % subjects.length],
-    ].filter(Boolean)
-
-    daySubjects.forEach((sub, subIdx) => {
-      const type = types[(dayIdx + subIdx) % types.length]
-      let actionTitle = ''
-      if (type === 'flashcards') actionTitle = `Revisão de flashcards — ${sub}`
-      else if (type === 'quiz') actionTitle = `Quiz gerado por IA — ${sub}`
-      else if (type === 'leitura') actionTitle = `Leitura guiada — Módulo 1 de ${sub}`
-      else actionTitle = `Resumo automático de ${sub}`
-
-      items.push({
-        id: `user-e-${count++}`,
-        day: d.day,
-        date: d.date,
-        title: actionTitle,
-        subject: sub,
-        type,
-        time: subIdx === 0 ? '18:00' : '20:30',
-        done: false,
-      })
-    })
+    return {
+      id: item.id,
+      day: weekday,
+      date: dateLabel,
+      title: item.topic || 'Sessão de estudos',
+      subject: item.subject || '',
+      type,
+      time: '18:00',
+      done: Boolean(item.completed),
+    }
   })
-
-  return items
 }
 
 function Toggle({
@@ -124,12 +90,34 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
   })
 
   useEffect(() => {
-    if (user?.subjects && user.subjects.length > 0) {
-      setEvents(generateEventsForUser(user.subjects, user.examDates))
-    } else {
+    const studentId = user?.id
+    if (!studentId) {
       setEvents([])
+      return
     }
-  }, [user?.subjects, user?.examDates])
+
+    const bffUrl = getApiUrl()
+    let cancelled = false
+
+    async function loadSchedule() {
+      try {
+        const res = await fetch(`${bffUrl}/api/study/schedule?studentId=${encodeURIComponent(studentId)}`)
+        if (!res.ok) {
+          if (!cancelled) setEvents([])
+          return
+        }
+        const data = await res.json()
+        if (!cancelled) setEvents(mapScheduleToEvents(data))
+      } catch {
+        if (!cancelled) setEvents([])
+      }
+    }
+
+    loadSchedule()
+    return () => {
+      cancelled = true
+    }
+  }, [user?.id, user?.subjects, user?.examDates])
 
   const grouped = events.reduce<Record<string, ScheduleEvent[]>>((acc, event) => {
     const key = `${event.day} · ${event.date}`
@@ -137,10 +125,27 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
     return acc
   }, {})
 
-  function toggleDone(id: string) {
-    setEvents((prev) =>
-      prev.map((e) => (e.id === id ? { ...e, done: !e.done } : e)),
-    )
+  async function toggleDone(id: string) {
+    const previous = events
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, done: !e.done } : e)))
+
+    const item = previous.find((e) => e.id === id)
+    if (!item || item.done) {
+      return
+    }
+
+    try {
+      const res = await fetch(`${getApiUrl()}/api/study/schedule/items/${encodeURIComponent(id)}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId: user?.id }),
+      })
+      if (!res.ok) {
+        setEvents(previous)
+      }
+    } catch {
+      setEvents(previous)
+    }
   }
 
   async function handleCloseSemester() {
@@ -158,10 +163,10 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
       })
       if (response.ok) {
         setClosedSuccess(true)
+        setEvents([])
       }
     } catch {
-      // Fallback local visual em caso de modo offline
-      setClosedSuccess(true)
+      setClosedSuccess(false)
     } finally {
       setClosing(false)
     }

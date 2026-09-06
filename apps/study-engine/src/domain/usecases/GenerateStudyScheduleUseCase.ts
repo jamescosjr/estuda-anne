@@ -1,4 +1,4 @@
-import { StudySchedule, StudyScheduleItem } from '../entities/StudySchedule.js';
+import { StudySchedule } from '../entities/StudySchedule.js';
 import {
   IStudyScheduleRepository,
   IMaterialRepository,
@@ -11,6 +11,8 @@ export interface GenerateStudyScheduleInput {
   subjects?: string[];
   targetExamDate?: Date;
   dailyStudyMinutesTarget?: number;
+  periodStartDate?: Date;
+  examDates?: Array<{ subject?: string; title?: string; date: string }>;
 }
 
 export class GenerateStudyScheduleUseCase {
@@ -29,24 +31,28 @@ export class GenerateStudyScheduleUseCase {
     }
 
     const materials = await this.materialRepository.findByStudentId(input.studentId, 20);
-    const flashcards = await this.flashcardRepository.findByStudentId(input.studentId);
+    const flashcards = await this.flashcardRepository.findDueCards(
+      input.studentId,
+      new Date(),
+      80
+    );
+
+    const targetExamDate = this.resolveTargetExamDate(input);
 
     const schedule = StudySchedule.create({
       studentId: input.studentId,
       title: input.title,
-      targetExamDate: input.targetExamDate,
+      targetExamDate,
     });
 
     const dailyMinutes = input.dailyStudyMinutesTarget ?? 45;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.resolvePlanningStart(input.periodStartDate);
 
-    // Determina a quantidade de dias para planejar (até o exame ou 7 dias por padrão)
     let planningDays = 7;
-    if (input.targetExamDate) {
-      const diffTime = input.targetExamDate.getTime() - today.getTime();
+    if (targetExamDate) {
+      const diffTime = targetExamDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      planningDays = Math.max(1, Math.min(diffDays, 30)); // Limita a até 30 dias de planejamento
+      planningDays = Math.max(1, Math.min(diffDays, 30));
     }
 
     // Distribuição balanceada de materiais e flashcards ao longo dos dias
@@ -75,6 +81,32 @@ export class GenerateStudyScheduleUseCase {
     }
 
     await this.scheduleRepository.save(schedule);
-    return schedule;
+    const persisted = await this.scheduleRepository.findByStudentId(input.studentId);
+    return persisted ?? schedule;
+  }
+
+  private resolveTargetExamDate(input: GenerateStudyScheduleInput): Date | undefined {
+    if (input.targetExamDate) {
+      return input.targetExamDate;
+    }
+    if (!input.examDates || input.examDates.length === 0) {
+      return undefined;
+    }
+    const upcoming = input.examDates
+      .map((exam) => new Date(exam.date))
+      .filter((date) => !Number.isNaN(date.getTime()) && date.getTime() > Date.now())
+      .sort((a, b) => a.getTime() - b.getTime());
+    return upcoming[0];
+  }
+
+  private resolvePlanningStart(periodStartDate?: Date): Date {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!periodStartDate) {
+      return today;
+    }
+    const start = new Date(periodStartDate);
+    start.setHours(0, 0, 0, 0);
+    return start.getTime() > today.getTime() ? start : today;
   }
 }

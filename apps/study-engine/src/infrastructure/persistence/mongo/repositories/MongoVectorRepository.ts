@@ -1,5 +1,6 @@
 import { Collection, Db } from 'mongodb';
 import { IVectorRepository, MaterialChunkEmbeddingsInput } from '../../../../domain/ports/IVectorRepository.js';
+import { cosineSimilarity, lexicalEmbedding } from '../../../../domain/services/LexicalEmbedding.js';
 
 interface VectorDocument {
   _id: string;
@@ -42,18 +43,26 @@ export class MongoVectorRepository implements IVectorRepository {
     query: string,
     limit = 5
   ): Promise<Array<{ textChunk: string }>> {
-    const filter: Record<string, any> = { studentId };
+    const filter: Record<string, unknown> = { studentId };
     if (materialId) {
       filter.materialId = materialId;
     }
 
-    if (query && query.trim().length > 0) {
-      const searchRegex = new RegExp(query.trim(), 'i');
-      filter.textChunk = searchRegex;
-    }
+    const docs = await this.collection.find(filter).toArray();
+    if (docs.length === 0) return [];
 
-    const docs = await this.collection.find(filter).limit(limit).toArray();
-    return docs.map((d) => ({ textChunk: d.textChunk }));
+    const queryEmbedding = lexicalEmbedding(query || '');
+    const ranked = docs
+      .map((doc) => ({
+        textChunk: doc.textChunk,
+        score: doc.embedding?.length
+          ? cosineSimilarity(queryEmbedding, doc.embedding)
+          : (query && doc.textChunk.toLowerCase().includes(query.toLowerCase()) ? 1 : 0),
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    return ranked.map((item) => ({ textChunk: item.textChunk }));
   }
 
   public async deleteEmbeddingsByMaterialIds(materialIds: string[]): Promise<void> {

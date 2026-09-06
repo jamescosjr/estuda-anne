@@ -8,4 +8,5 @@ export * from './IJobQueuePort.js';
 export * from './IStorageProvider.js';
 export * from './IVectorRepository.js';
 export * from './IAIFeedbackRepository.js';
+export * from './IContentExtractor.js';
 

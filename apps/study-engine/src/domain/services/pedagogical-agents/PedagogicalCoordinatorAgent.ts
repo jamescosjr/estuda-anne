@@ -35,18 +35,20 @@ export class PedagogicalCoordinatorAgent {
       material.id,
       material.studentId,
       rawText,
-      analysis.keyConcepts
+      analysis.keyConcepts,
+      undefined,
+      false
     );
 
-    // 3. Etapa 3: Invocação do QuizSpecialistAgent (Testes diagnósticos de múltipla escolha)
     const quiz = await this.quizAgent.generateQuiz(
       material.id,
       material.studentId,
       material.title,
-      rawText
+      rawText,
+      undefined,
+      false
     );
 
-    // 4. Etapa 4: Invocação do QualityGateAgent (Revisão e controle de qualidade)
     const qualityResult = this.qualityGateAgent.evaluateQuality(
       analysis.summary,
       analysis.keyConcepts,
@@ -58,7 +60,9 @@ export class PedagogicalCoordinatorAgent {
       throw new Error(`Falha no controle de qualidade pedagógico: ${qualityResult.reason}`);
     }
 
-    // 5. Liberação final pelo Coordenador (Status PROCESSED liberado para o estudante)
+    await this.flashcardAgent.persistFlashcards(flashcards);
+    await this.quizAgent.persistQuiz(quiz);
+
     material.completeProcessing(analysis.summary, analysis.keyConcepts);
 
     return {

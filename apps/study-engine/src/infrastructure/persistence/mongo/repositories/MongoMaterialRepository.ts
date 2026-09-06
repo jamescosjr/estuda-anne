@@ -24,7 +24,7 @@ export class MongoMaterialRepository implements IMaterialRepository {
 
   public async findByStudentId(studentId: string, limit = 100, skip = 0): Promise<Material[]> {
     const docs = await this.collection
-      .find({ studentId })
+      .find({ studentId }, { projection: { rawContent: 0 } })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)

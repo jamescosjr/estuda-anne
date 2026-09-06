@@ -33,6 +33,11 @@ export async function bootstrapBFF() {
       return cb(new Error('Not allowed by CORS'), false);
     },
   });
+  app.addHook('onRequest', async (request, reply) => {
+    const correlationId = String(request.headers['x-correlation-id'] || crypto.randomUUID());
+    request.headers['x-correlation-id'] = correlationId;
+    reply.header('x-correlation-id', correlationId);
+  });
   await app.register(studyRoutes);
   await app.register(authRoutes);
 

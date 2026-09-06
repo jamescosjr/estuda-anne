@@ -35,4 +35,9 @@ export class MongoQuizRepository implements IQuizRepository {
   public async delete(id: string): Promise<void> {
     await this.collection.deleteOne({ _id: id });
   }
+
+  public async deleteByStudentId(studentId: string): Promise<void> {
+    if (!studentId) return;
+    await this.collection.deleteMany({ studentId });
+  }
 }

@@ -48,12 +48,12 @@ test.describe('Jornada Completa da agent-Anne — Estuda Anne (Desktop & Mobile)
     const fileInput = page.locator('input[type="file"]')
     if (await fileInput.count() > 0) {
       await fileInput.setInputFiles({
-        name: 'Fisiologia_Renal_Aula04.pdf',
-        mimeType: 'application/pdf',
-        buffer: Buffer.from('Conteudo de estudo de Fisiologia Renal para testes E2E Playwright'),
+        name: 'Fisiologia_Renal_Aula04.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('Conteudo de estudo de Fisiologia Renal para testes E2E Playwright com cidadania e glomerulo.'),
       })
-      // Aguarda feedback visual do upload
-      await expect(page.getByText(/Fisiologia_Renal_Aula04.pdf/i)).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/Fisiologia_Renal_Aula04.txt/i)).toBeVisible({ timeout: 10000 })
+      await expect(page.getByText(/Concluído|Falha|Processando/i).first()).toBeVisible({ timeout: 15000 })
     }
   })
 
@@ -87,7 +87,7 @@ test.describe('Jornada Completa da agent-Anne — Estuda Anne (Desktop & Mobile)
     await expect(page.getByText('Questão gerada por IA')).toBeVisible()
     
     // Seleciona a primeira opção
-    const firstOption = page.locator('button').filter({ hasText: /Corpo caloso|38 ATP|2 ATP|Cerebelo/i }).first()
+    const firstOption = page.locator('button').filter({ hasText: /Corpo caloso|38 ATP|2 ATP|Cerebelo|derivada|glicólise|Aplicar o modelo|Consolidação/i }).first()
     await firstOption.click()
 
     // Confirma resposta
