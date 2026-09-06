@@ -23,6 +23,10 @@ export const CompleteScheduleItemBodySchema = z.object({
   studentId: z.string().min(1),
 });
 
+export const CompleteScheduleItemParamsSchema = z.object({
+  itemId: z.string().min(1),
+});
+
 export const AnalyzeScheduleFileBodySchema = z.object({
   studentId: z.string().min(1),
   fileBase64: z.string().optional(),
