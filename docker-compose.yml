@@ -100,14 +100,16 @@ services:
     networks:
       - estuda-anne-network
 
-  # Proxy Reverso Nginx
+  # Proxy Reverso Nginx (rede Docker).
+  # 80/443 no host ja costumam estar com Cloudflare/nginx da VPS — use
+  # NGINX_HTTP_PORT / NGINX_HTTPS_PORT se quiser publicar neste container.
   nginx:
     image: nginx:alpine
     container_name: estuda-anne-nginx
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "${NGINX_HTTP_PORT:-8080}:80"
+      - "${NGINX_HTTPS_PORT:-8443}:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - certbot_etc:/etc/letsencrypt

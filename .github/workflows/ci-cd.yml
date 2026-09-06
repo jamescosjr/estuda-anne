@@ -62,6 +62,8 @@ jobs:
             git checkout main
             git pull --ff-only origin main
             docker compose down --remove-orphans
+            docker ps --filter publish=80 -q | xargs -r docker stop
+            docker rm -f estuda-anne-nginx 2>/dev/null || true
             docker compose up -d --build
             docker compose ps
             echo "Deploy completed successfully!"
