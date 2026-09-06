@@ -67,7 +67,12 @@ function createStorageProvider(): IStorageProvider {
 }
 
 export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true, ignoreTrailingSlash: true, pluginTimeout: 120000 });
+  const app = Fastify({
+    logger: true,
+    ignoreTrailingSlash: true,
+    pluginTimeout: 120000,
+    bodyLimit: 104857600,
+  });
 
   await app.register(cors, {
     origin: (origin, cb) => {

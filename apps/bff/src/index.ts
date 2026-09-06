@@ -10,7 +10,11 @@ dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 export async function bootstrapBFF() {
-  const app = Fastify({ logger: true, ignoreTrailingSlash: true });
+  const app = Fastify({
+    logger: true,
+    ignoreTrailingSlash: true,
+    bodyLimit: 104857600,
+  });
   DailyBriefingListener.initialize();
 
   await app.register(cors, {

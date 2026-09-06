@@ -65,4 +65,13 @@ jobs:
             docker rm -f estuda-anne-nginx 2>/dev/null || true
             docker compose up -d --build
             docker compose ps
+            if [ -d /etc/nginx/conf.d ]; then
+              if cp /opt/estuda-anne/nginx/host-vps-upload.conf /etc/nginx/conf.d/estuda-anne-upload.conf; then
+                nginx -t
+                systemctl reload nginx || service nginx reload
+                echo "Host nginx client_max_body_size set to 100m"
+              else
+                echo "WARN: could not write /etc/nginx/conf.d; host nginx may still 413 uploads"
+              fi
+            fi
             echo "Deploy completed successfully!"
