@@ -22,6 +22,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV STUDY_ENGINE_PORT=3002
 ENV STUDY_ENGINE_HOST=0.0.0.0
+ENV MONGODB_URI=mongodb://mongodb:27017/estuda-anne
 
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 

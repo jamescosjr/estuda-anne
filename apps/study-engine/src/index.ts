@@ -97,17 +97,38 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
     reply.header(CORRELATION_HEADER, correlationId);
   });
 
-  app.get('/health', async () => {
+  app.get('/health', async (_request, reply) => {
+    const mongoReady = Boolean(app.mongoReady);
+    if (!mongoReady) {
+      return reply.status(503).send({
+        service: 'estuda-anne-study-engine',
+        status: 'starting',
+        mongo: false,
+        timestamp: new Date().toISOString(),
+      });
+    }
     return {
       service: 'estuda-anne-study-engine',
       status: 'healthy',
+      mongo: true,
       timestamp: new Date().toISOString(),
     };
   });
 
   if (options.connectMongo !== false) {
-    const mongo = MongoConnection.getInstance();
-    const db = await mongo.connect();
+    await registerPersistenceRoutes(app);
+  }
+
+  return app;
+}
+
+async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
+  if (app.mongoReady) {
+    return;
+  }
+
+  const mongo = MongoConnection.getInstance();
+  const db = await mongo.connect();
 
     const materialRepo = new MongoMaterialRepository(db);
     const flashcardRepo = new MongoFlashcardRepository(db);
@@ -191,22 +212,35 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
     await app.register(quizRoutes, { prefix: '/quizzes', controller: quizController });
     await app.register(semesterRoutes, { prefix: '/semesters', controller: semesterController });
     await app.register(feedbackRoutes, { controller: feedbackController });
-  }
+  app.mongoReady = true;
+}
 
-  return app;
+declare module 'fastify' {
+  interface FastifyInstance {
+    mongoReady?: boolean;
+  }
+}
+
+async function connectPersistenceWithRetry(app: FastifyInstance): Promise<void> {
+  for (;;) {
+    try {
+      await registerPersistenceRoutes(app);
+      app.log.info('Study Engine persistence routes registered');
+      return;
+    } catch (err) {
+      app.log.error({ err }, 'MongoDB indisponivel; nova tentativa em 3s');
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  bootstrapStudyEngine()
-    .then((app) => {
+  bootstrapStudyEngine({ connectMongo: false })
+    .then(async (app) => {
       const port = Number(process.env.STUDY_ENGINE_PORT || process.env.PORT) || 3002;
-      app.listen({ port, host: '0.0.0.0' }, (err, address) => {
-        if (err) {
-          app.log.error(err);
-          process.exit(1);
-        }
-        app.log.info(`Study Engine running at ${address}`);
-      });
+      await app.listen({ port, host: '0.0.0.0' });
+      app.log.info(`Study Engine running at http://0.0.0.0:${port}`);
+      await connectPersistenceWithRetry(app);
     })
     .catch((err) => {
       console.error(JSON.stringify({

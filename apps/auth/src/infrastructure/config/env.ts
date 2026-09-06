@@ -36,5 +36,8 @@ const parsedEnv = envSchema.parse(process.env);
 
 export const env = {
   ...parsedEnv,
-  MONGODB_URI: rewriteLocalMongoHostForDocker(parsedEnv.MONGODB_URI),
+  MONGODB_URI: rewriteLocalMongoHostForDocker(
+    parsedEnv.MONGODB_URI,
+    existsSync('/.dockerenv') || process.env.NODE_ENV === 'production'
+  ),
 };

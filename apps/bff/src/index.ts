@@ -44,6 +44,9 @@ export async function bootstrapBFF() {
   app.get('/health', async () => {
     return { service: 'estuda-anne-bff', status: 'healthy', timestamp: new Date().toISOString() };
   });
+  app.get('/api/health', async () => {
+    return { service: 'estuda-anne-bff', status: 'healthy', timestamp: new Date().toISOString() };
+  });
 
   return app;
 }

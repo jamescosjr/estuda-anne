@@ -12,6 +12,12 @@ services:
       MONGO_INITDB_DATABASE: estuda-anne
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
     networks:
       - estuda-anne-network
 
@@ -34,7 +40,8 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@estuda-anne.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
     networks:
       - estuda-anne-network
 
@@ -52,8 +59,7 @@ services:
     environment:
       - NODE_ENV=production
       - STUDY_ENGINE_PORT=3002
-      # localhost no .env da VPS e reescrito no boot para o host Docker `mongodb`
-      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
+      - MONGODB_URI=mongodb://mongodb:27017/estuda-anne
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLOUDFLARE_R2_ACCOUNT_ID=${CLOUDFLARE_R2_ACCOUNT_ID}
       - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}
@@ -61,7 +67,14 @@ services:
       - CLOUDFLARE_R2_BUCKET_NAME=${CLOUDFLARE_R2_BUCKET_NAME:-estuda-anne}
       - CLOUDFLARE_R2_ENDPOINT=${CLOUDFLARE_R2_ENDPOINT}
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
     networks:
       - estuda-anne-network
 
@@ -83,8 +96,10 @@ services:
       - STUDY_ENGINE_URL=http://study-engine:3002
       - CORS_ORIGIN=${CORS_ORIGIN:-https://estuda-anne.singulartech.space}
     depends_on:
-      - auth
-      - study-engine
+      auth:
+        condition: service_started
+      study-engine:
+        condition: service_healthy
     networks:
       - estuda-anne-network
 

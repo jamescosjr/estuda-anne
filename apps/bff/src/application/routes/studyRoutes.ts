@@ -4,7 +4,8 @@ import { DailyBriefingListener } from '../listeners/DailyBriefingListener.js';
 
 function resolveStudyEngineUrl(): string {
   const url = (process.env.STUDY_ENGINE_URL || 'http://localhost:3002').replace(/\/$/, '');
-  if (existsSync('/.dockerenv') && /localhost|127\.0\.0\.1/.test(url)) {
+  const inContainer = existsSync('/.dockerenv') || process.env.NODE_ENV === 'production';
+  if (inContainer && /localhost|127\.0\.0\.1/.test(url)) {
     return url.replace(/localhost|127\.0\.0\.1/g, 'study-engine');
   }
   return url;
@@ -22,6 +23,13 @@ async function readEngineJson(res: Response): Promise<unknown> {
   } catch {
     return { message: text.slice(0, 240) };
   }
+}
+
+function engineFetchError(err: unknown): { code?: string; message: string } {
+  const cause = err && typeof err === 'object' ? (err as { cause?: { code?: string; message?: string } }).cause : undefined;
+  const code = cause?.code || (err as { code?: string })?.code;
+  const message = cause?.message || (err instanceof Error ? err.message : String(err));
+  return { code, message };
 }
 
 function normalizeClientFormat(format: string): string {
@@ -260,7 +268,19 @@ export async function studyRoutes(app: FastifyInstance) {
     }
   });
 
-  // Rota para Gerar Cronograma Inteligente com IA com base nas matérias do estudante
+  app.get('/api/study/engine-health', async (_request, reply) => {
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/health`, { signal: AbortSignal.timeout(4000) });
+      return reply.status(res.status).send(await readEngineJson(res));
+    } catch (err: unknown) {
+      const detail = engineFetchError(err);
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        studyEngineUrl: STUDY_ENGINE_URL,
+        detail: detail.code || detail.message,
+      });
+    }
+  });
   app.post('/api/study/schedule/generate', async (request, reply) => {
     const { studentId = 'anne-student-1', title = 'Plano do Semestre', subjects = [], targetExamDate, dailyStudyMinutesTarget = 45, periodStartDate, periodEndDate, examDates } = (request.body as any) || {};
 
@@ -278,6 +298,7 @@ export async function studyRoutes(app: FastifyInstance) {
           periodEndDate,
           examDates,
         }),
+        signal: AbortSignal.timeout(20000),
       });
 
       if (res.ok) {
@@ -288,14 +309,17 @@ export async function studyRoutes(app: FastifyInstance) {
       const errJson = await readEngineJson(res);
       return reply.status(res.status).send(errJson);
     } catch (err: any) {
+      const detail = engineFetchError(err);
       app.log.warn({
         err,
         cause: err?.cause,
         studyEngineUrl: STUDY_ENGINE_URL,
+        detail,
       }, 'Study Engine offline ao gerar cronograma');
       return reply.status(503).send({
         error: 'StudyEngineUnavailable',
         message: 'Falha ao gerar cronograma no Study Engine',
+        detail: detail.code || detail.message,
       });
     }
   });

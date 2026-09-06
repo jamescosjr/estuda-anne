@@ -1,5 +1,9 @@
 import { MongoClient, Db } from 'mongodb';
-import { env } from '../../config/env.js';
+import { env, mongoUriCandidates } from '../../config/env.js';
+
+function redactMongoUri(uri: string): string {
+  return uri.replace(/\/\/([^@/]+)@/g, '//***@');
+}
 
 export class MongoConnection {
   private static instance: MongoConnection | null = null;
@@ -20,19 +24,36 @@ export class MongoConnection {
       return this.db;
     }
 
-    this.client = new MongoClient(uri, {
-      maxPoolSize: 10,
-      minPoolSize: 1,
-      serverSelectionTimeoutMS: 5000,
-    });
-    await this.client.connect();
-    this.db = this.client.db('estuda-anne');
+    const candidates = mongoUriCandidates(uri);
+    let lastError: unknown;
 
-    if (!this.db) {
-      throw new Error('Database connection failed');
+    for (const candidate of candidates) {
+      try {
+        this.client = new MongoClient(candidate, {
+          maxPoolSize: 10,
+          minPoolSize: 1,
+          serverSelectionTimeoutMS: 3000,
+        });
+        await this.client.connect();
+        this.db = this.client.db('estuda-anne');
+        await this.ensureIndexes();
+        return this.db;
+      } catch (err) {
+        lastError = err;
+        console.error(JSON.stringify({
+          event: 'mongodb_connect_failed',
+          uri: redactMongoUri(candidate),
+          message: err instanceof Error ? err.message : String(err),
+        }));
+        if (this.client) {
+          await this.client.close().catch(() => undefined);
+          this.client = null;
+        }
+        this.db = null;
+      }
     }
-    await this.ensureIndexes();
-    return this.db;
+
+    throw lastError instanceof Error ? lastError : new Error('Database connection failed');
   }
 
   public getDb(): Db {

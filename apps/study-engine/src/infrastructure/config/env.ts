@@ -19,13 +19,19 @@ const envSchema = z.object({
   CLOUDFLARE_R2_ENDPOINT: z.string().optional(),
 });
 
+const DOCKER_MONGO_URI = 'mongodb://mongodb:27017/estuda-anne';
+
+function isLocalMongoHost(hostname: string): boolean {
+  return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
 export function rewriteLocalMongoHostForDocker(uri: string, inDocker = existsSync('/.dockerenv')): string {
   if (!inDocker || !uri) {
     return uri;
   }
   try {
     const parsed = new URL(uri);
-    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+    if (isLocalMongoHost(parsed.hostname)) {
       parsed.hostname = 'mongodb';
       return parsed.toString();
     }
@@ -35,9 +41,37 @@ export function rewriteLocalMongoHostForDocker(uri: string, inDocker = existsSyn
   return uri;
 }
 
+export function mongoUriCandidates(uri: string): string[] {
+  const candidates: string[] = [];
+  const add = (value: string) => {
+    if (value && !candidates.includes(value)) {
+      candidates.push(value);
+    }
+  };
+
+  let hostname = '';
+  try {
+    hostname = new URL(uri).hostname;
+  } catch {
+    hostname = '';
+  }
+
+  const dockerized = rewriteLocalMongoHostForDocker(uri, true);
+  if (isLocalMongoHost(hostname) || /localhost|127\.0\.0\.1/.test(uri)) {
+    add(dockerized);
+    add(uri);
+  } else {
+    add(uri);
+    add(dockerized);
+  }
+  add(DOCKER_MONGO_URI);
+  return candidates;
+}
+
 const parsedEnv = envSchema.parse(process.env);
+const inContainer = existsSync('/.dockerenv') || process.env.NODE_ENV === 'production';
 
 export const env = {
   ...parsedEnv,
-  MONGODB_URI: rewriteLocalMongoHostForDocker(parsedEnv.MONGODB_URI),
+  MONGODB_URI: rewriteLocalMongoHostForDocker(parsedEnv.MONGODB_URI, inContainer),
 };
