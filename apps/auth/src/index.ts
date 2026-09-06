@@ -61,30 +61,18 @@ export async function bootstrapAuthServer(options: BootstrapAuthOptions = {}): P
   if (options.userRepo) {
     userRepo = options.userRepo;
   } else if (options.connectMongo !== false) {
-    try {
-      const mongo = MongoConnection.getInstance();
-      const db = await mongo.connect();
-      userRepo = new MongoUserRepository(db);
+    const mongo = MongoConnection.getInstance();
+    const db = await mongo.connect();
+    userRepo = new MongoUserRepository(db);
 
-      const passwordHasher = new BcryptPasswordHasher();
-      const seedAdminUseCase = new SeedAdminUserUseCase(userRepo, passwordHasher);
-      const admin = await seedAdminUseCase.execute({
-        adminEmail: env.ADMIN_EMAIL,
-        adminPasswordText: env.ADMIN_PASSWORD,
-        adminName: 'James (Admin Master)',
-      });
-      app.log.info({ adminId: admin.id, email: admin.email }, 'Usuário Admin semeado/verificado no MongoDB Atlas');
-    } catch (err) {
-      app.log.warn({ err }, 'Conexão com MongoDB indisponível no bootstrap do Auth. Executando em modo degradado com InMemoryUserRepository.');
-      userRepo = new InMemoryUserRepository();
-      const passwordHasher = new BcryptPasswordHasher();
-      const seedAdminUseCase = new SeedAdminUserUseCase(userRepo, passwordHasher);
-      await seedAdminUseCase.execute({
-        adminEmail: env.ADMIN_EMAIL,
-        adminPasswordText: env.ADMIN_PASSWORD,
-        adminName: 'James (Admin Master)',
-      });
-    }
+    const passwordHasher = new BcryptPasswordHasher();
+    const seedAdminUseCase = new SeedAdminUserUseCase(userRepo, passwordHasher);
+    const admin = await seedAdminUseCase.execute({
+      adminEmail: env.ADMIN_EMAIL,
+      adminPasswordText: env.ADMIN_PASSWORD,
+      adminName: 'James (Admin Master)',
+    });
+    app.log.info({ adminId: admin.id, email: admin.email }, 'Usuário Admin semeado/verificado no MongoDB');
   } else {
     userRepo = new InMemoryUserRepository();
     const passwordHasher = new BcryptPasswordHasher();

@@ -25,10 +25,12 @@ export class MongoConnection {
       minPoolSize: 1,
       serverSelectionTimeoutMS: 5000,
     });
-
     await this.client.connect();
     this.db = this.client.db();
 
+    if (!this.db) {
+      throw new Error('Database connection failed');
+    }
     await this.ensureIndexes();
     return this.db;
   }

@@ -58,44 +58,40 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
   });
 
   if (options.connectMongo !== false) {
-    try {
-      const mongo = MongoConnection.getInstance();
-      const db = await mongo.connect();
+    const mongo = MongoConnection.getInstance();
+    const db = await mongo.connect();
 
-      // Repositórios Concretos
-      const materialRepo = new MongoMaterialRepository(db);
-      const flashcardRepo = new MongoFlashcardRepository(db);
-      const quizRepo = new MongoQuizRepository(db);
-      const feedbackRepo = new MongoAIFeedbackRepository(db);
+    // Repositórios Concretos
+    const materialRepo = new MongoMaterialRepository(db);
+    const flashcardRepo = new MongoFlashcardRepository(db);
+    const quizRepo = new MongoQuizRepository(db);
+    const feedbackRepo = new MongoAIFeedbackRepository(db);
 
-      // Adaptadores de IA
-      const geminiAdapter = new GeminiFlashAdapter();
-      const whisperAdapter = new WhisperAdapter();
+    // Adaptadores de IA
+    const geminiAdapter = new GeminiFlashAdapter();
+    const whisperAdapter = new WhisperAdapter();
 
-      // Use Cases do Domínio Puro
-      const processMaterialUseCase = new ProcessMaterialUseCase(
-        materialRepo,
-        flashcardRepo,
-        quizRepo,
-        geminiAdapter,
-        whisperAdapter
-      );
-      const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo);
-      const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo);
-      const submitAIFeedbackUseCase = new SubmitAIFeedbackUseCase(feedbackRepo);
+    // Use Cases do Domínio Puro
+    const processMaterialUseCase = new ProcessMaterialUseCase(
+      materialRepo,
+      flashcardRepo,
+      quizRepo,
+      geminiAdapter,
+      whisperAdapter
+    );
+    const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo);
+    const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo);
+    const submitAIFeedbackUseCase = new SubmitAIFeedbackUseCase(feedbackRepo);
 
-      // Controllers
-      const materialController = new MaterialController(materialRepo, processMaterialUseCase);
-      const flashcardController = new FlashcardController(reviewFlashcardUseCase, getDueFlashcardsUseCase);
-      const feedbackController = new AIFeedbackController(submitAIFeedbackUseCase, feedbackRepo);
+    // Controllers
+    const materialController = new MaterialController(materialRepo, processMaterialUseCase);
+    const flashcardController = new FlashcardController(reviewFlashcardUseCase, getDueFlashcardsUseCase);
+    const feedbackController = new AIFeedbackController(submitAIFeedbackUseCase, feedbackRepo);
 
-      // Registro de Rotas
-      await app.register(materialRoutes, { prefix: '/materials', controller: materialController });
-      await app.register(flashcardRoutes, { prefix: '/flashcards', controller: flashcardController });
-      await app.register(feedbackRoutes, { controller: feedbackController });
-    } catch (err) {
-      app.log.warn({ err }, 'MongoDB connection skipped or failed during bootstrap. Running in degraded mode.');
-    }
+    // Registro de Rotas
+    await app.register(materialRoutes, { prefix: '/materials', controller: materialController });
+    await app.register(flashcardRoutes, { prefix: '/flashcards', controller: flashcardController });
+    await app.register(feedbackRoutes, { controller: feedbackController });
   }
 
   return app;
