@@ -75,7 +75,7 @@ export function Materials() {
         const res = await fetch(`${bffUrl}/api/materials?studentId=${encodeURIComponent(studentId)}`)
         if (res.ok) {
           const list = await res.json()
-          if (Array.isArray(list) && list.length > 0) {
+          if (Array.isArray(list)) {
             const mapped: UploadItem[] = list.map((m: any) => ({
               id: m.id,
               name: m.title,

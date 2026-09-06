@@ -26,7 +26,7 @@ export class MongoConnection {
       serverSelectionTimeoutMS: 5000,
     });
     await this.client.connect();
-    this.db = this.client.db();
+    this.db = this.client.db('estuda-anne');
 
     if (!this.db) {
       throw new Error('Database connection failed');
