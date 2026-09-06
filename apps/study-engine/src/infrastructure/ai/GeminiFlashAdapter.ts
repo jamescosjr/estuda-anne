@@ -79,40 +79,47 @@ ${content.slice(0, 10000)}`;
       for (let i = 0; i < Math.min(count, Math.max(3, distinctTopics.length)); i++) {
         const topic = distinctTopics[i] || `Conceito fundamental ${i + 1}`;
         cards.push({
-          front: `[Card ${i + 1}] Qual o significado e aplicação do tópico: "${topic.slice(0, 60)}..."?`,
-          back: `Representa o conceito-chave: ${topic}. Essencial para fixação e retenção no exame.`,
+          front: `[Gatilho] O que caracteriza: ${topic.slice(0, 45)}?`,
+          back: `Refere-se ao conceito chave de ${topic.slice(0, 40)}. Garante a compreensão atômica e retenção do conteúdo.`,
         });
       }
 
       return cards.length > 0 ? cards : [
         {
-          front: 'Qual o conceito central abordado neste material de estudo?',
-          back: content.slice(0, 120).trim() + '...',
+          front: 'Qual a definição atômica do conceito principal?',
+          back: content.slice(0, 100).trim() + '.',
         },
         {
-          front: 'Como aplicar os fundamentos teóricos em exercícios práticos?',
-          back: 'Relacionando os axiomas principais com resolução ativa de problemas e estudo espaçado.',
+          front: 'Como aplicar este fundamento na prática?',
+          back: 'Relacionando os axiomas teóricos com resolução ativa de problemas.',
         },
         {
-          front: 'Qual a principal diferença entre os modelos apresentados no texto?',
-          back: 'A abrangência analítica e a eficiência na interpretação dos resultados em exames.',
+          front: 'Qual o ponto crítico de diferenciação entre os modelos?',
+          back: 'A abrangência analítica e a eficiência no diagnóstico de resultados.',
         },
       ];
     }
 
-    const prompt = `Você é um Engenheiro Pedagógico especialista em elaboração de exames universitários.
-Gere exatamente ${count} flashcards de alta qualidade pedagógica a partir do texto a seguir.
+    const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
 
-REGRAS RÍGIDAS DE QUALIDADE:
-1. Cada flashcard deve abordar um tópico/aspecto TOTALMENTE DIFERENTE do texto (conceito, aplicação, definição, análise crítica).
-2. NUNCA repita enunciados, perguntas ou respostas.
-3. As perguntas (front) devem ser claras, profundas e objetivas. As respostas (back) devem ser completas e explicativas.
+MATERIAL BASE:
+${content.slice(0, 10000)}
 
-Formato JSON estrito esperado:
-[{"front": "...", "back": "..."}]
+TAREFA:
+Gere ${count} flashcards com base estritamente no material acima.
 
-Texto:
-${content.slice(0, 10000)}`;
+REGRAS PARA FLASHCARDS:
+1. Seja atômico: cada flashcard deve focar em apenas UM conceito chave.
+2. Formato frente/verso: A frente deve ser um gatilho de memória (pergunta rápida ou termo). O verso deve ter no máximo 2 frases curtas.
+
+FORMATO DE SAÍDA:
+Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicação, sem formatação markdown em volta:
+[
+  {
+    "front": "...",
+    "back": "..."
+  }
+]`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
@@ -121,7 +128,10 @@ ${content.slice(0, 10000)}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.6,
+          },
         }),
       }
     );
@@ -141,44 +151,46 @@ ${content.slice(0, 10000)}`;
       const questions: GeneratedQuizQuestionDTO[] = [];
 
       for (let i = 0; i < questionsCount; i++) {
-        const sentence = sentences[i % sentences.length] || `tópico central de estudo número ${i + 1}`;
+        const sentence = sentences[i % sentences.length] || `tópico de aplicação acadêmica ${i + 1}`;
         questions.push({
-          prompt: `Em relação ao trecho "${sentence.slice(0, 70)}...", assinale a alternativa correta:`,
+          prompt: `[Estudo de Caso] Suponha que Anne precisa analisar o seguinte cenário prático relacionado a "${sentence.slice(0, 50)}...": qual a melhor decisão técnica e por quê?`,
           options: [
-            `Trata-se do conceito principal referente a ${sentence.slice(0, 40)}.`,
-            `É uma exceção aplicável apenas em condições laboratoriais específicas.`,
-            `Representa um erro comum de interpretação que deve ser evitado.`,
-            `Nenhuma das alternativas anteriores está de acordo com a teoria.`,
+            `Aplicar o modelo direto, fundamentado em ${sentence.slice(0, 30)}.`,
+            `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
+            `Confundir a hipótese de partida com o resultado de amostragem secundário.`,
+            `Desconsiderar as restrições operacionais e atuar apenas no escopo teórico.`,
           ],
           correctAnswerIndex: 0,
-          explanation: `A afirmação reflete o ponto correto: ${sentence}.`,
+          explanation: `A alternativa correta aplica diretamente os princípios de ${sentence.slice(0, 30)}. A segunda opção é incorreta pois desconsidera o rigor técnico necessário no cenário.`,
         });
       }
 
       return questions;
     }
 
-    const prompt = `Você é um Professor Universitário responsável por criar quizzes de avaliação para a aluna Anne.
-Gere exatamente ${questionsCount} questões de múltipla escolha inéditas a partir do conteúdo fornecido.
+    const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
 
-REGRAS OBRIGATÓRIAS DE EXCELÊNCIA PEDAGÓGICA:
-1. Cada questão deve testar um conceito/tópico TOTALMENTE DIFERENTE.
-2. NUNCA gere perguntas repetidas ou com enunciados parecidos.
-3. Todas as 4 opções (0 a 3) em CADA questão devem ser ÚNICAS, plausíveis e bem formuladas. Sem opções óbvias ou idênticas.
-4. Indique o índice exato da resposta correta (correctAnswerIndex de 0 a 3) e uma explicação didática e encorajadora no campo "explanation".
+MATERIAL BASE:
+${content.slice(0, 10000)}
 
-Formato JSON estrito esperado:
+TAREFA:
+Gere ${questionsCount} quizzes com base estritamente no material acima.
+
+REGRAS PARA QUIZZES (Múltipla Escolha):
+1. Crie cenários práticos ou estudos de caso sempre que possível, forçando o pensamento crítico (nível de "Aplicação" e "Análise" da Taxonomia de Bloom).
+2. As alternativas incorretas devem ser âncoras plausíveis, representando conceitos parecidos ou confusões comuns. Não crie alternativas obviamente falsas.
+3. Inclua uma propriedade "explicacao" no JSON detalhando exatamente por que a alternativa correta é a certa e por que a mais plausível entre as erradas está incorreta.
+
+FORMATO DE SAÍDA:
+Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicação, sem formatação markdown em volta:
 [
   {
     "prompt": "...",
     "options": ["opcao 0", "opcao 1", "opcao 2", "opcao 3"],
     "correctAnswerIndex": 0,
-    "explanation": "..."
+    "explicacao": "..."
   }
-]
-
-Conteúdo:
-${content.slice(0, 10000)}`;
+]`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
@@ -187,7 +199,10 @@ ${content.slice(0, 10000)}`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.6,
+          },
         }),
       }
     );
@@ -198,7 +213,14 @@ ${content.slice(0, 10000)}`;
 
     const data = await response.json() as any;
     const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return JSON.parse(textOutput);
+    const parsed = JSON.parse(textOutput);
+
+    return parsed.map((item: any) => ({
+      prompt: item.prompt,
+      options: item.options,
+      correctAnswerIndex: item.correctAnswerIndex,
+      explanation: item.explanation ?? item.explicacao ?? '',
+    }));
   }
 
   public async analyzeScheduleImageOrDocument(fileData: {
