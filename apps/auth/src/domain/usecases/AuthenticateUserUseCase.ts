@@ -1,6 +1,7 @@
 import { IUserRepository } from '../ports/IUserRepository.js';
 import { IPasswordHasher } from '../ports/IPasswordHasher.js';
 import { ITokenProvider } from '../ports/ITokenProvider.js';
+import { User } from '../entities/User.js';
 
 export interface AuthenticateUserDTO {
   email: string;
@@ -9,12 +10,7 @@ export interface AuthenticateUserDTO {
 
 export interface AuthenticateUserResponse {
   token: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
+  user: ReturnType<User['toJSON']>;
 }
 
 export class AuthenticateUserUseCase {
@@ -43,12 +39,7 @@ export class AuthenticateUserUseCase {
 
     return {
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      user: user.toJSON(),
     };
   }
 }
