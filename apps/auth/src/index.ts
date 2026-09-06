@@ -87,6 +87,13 @@ export async function bootstrapAuthServer(options: BootstrapAuthOptions = {}): P
     }
   } else {
     userRepo = new InMemoryUserRepository();
+    const passwordHasher = new BcryptPasswordHasher();
+    const seedAdminUseCase = new SeedAdminUserUseCase(userRepo, passwordHasher);
+    await seedAdminUseCase.execute({
+      adminEmail: env.ADMIN_EMAIL,
+      adminPasswordText: env.ADMIN_PASSWORD,
+      adminName: 'James (Admin Master)',
+    });
   }
 
   const passwordHasher = new BcryptPasswordHasher();
