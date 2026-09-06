@@ -21,11 +21,13 @@ export class MongoStudyScheduleRepository implements IStudyScheduleRepository {
     if (existing) {
       doc._id = existing._id;
       doc.createdAt = existing.createdAt;
-      await this.collection.replaceOne({ _id: existing._id }, doc);
-      return;
     }
 
-    await this.collection.insertOne(doc);
+    await this.collection.replaceOne(
+      { studentId: schedule.studentId },
+      doc,
+      { upsert: true }
+    );
   }
 
   public async findById(id: string): Promise<StudySchedule | null> {

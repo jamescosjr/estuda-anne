@@ -52,6 +52,7 @@ services:
     environment:
       - NODE_ENV=production
       - STUDY_ENGINE_PORT=3002
+      # localhost no .env da VPS e reescrito no boot para o host Docker `mongodb`
       - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLOUDFLARE_R2_ACCOUNT_ID=${CLOUDFLARE_R2_ACCOUNT_ID}

@@ -154,10 +154,10 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
           studentId: user?.id || 'anne-student-1',
           title: `Cronograma — ${course}`,
           subjects,
-          periodStartDate,
-          periodEndDate,
-          examDates,
-          dailyStudyMinutesTarget: studyGoalMinutes,
+          periodStartDate: periodStartDate || undefined,
+          periodEndDate: periodEndDate || undefined,
+          examDates: examDates.filter((exam) => Boolean(exam.date)),
+          dailyStudyMinutesTarget: studyGoalMinutes || 45,
         }),
       })
 

@@ -29,6 +29,10 @@ export type CreateStudyScheduleProps = {
   items?: StudyScheduleItem[];
 };
 
+function isFutureDate(date?: Date): date is Date {
+  return Boolean(date && !Number.isNaN(date.getTime()) && date.getTime() > Date.now());
+}
+
 export class StudySchedule {
   private props: StudyScheduleProps;
 
@@ -43,16 +47,14 @@ export class StudySchedule {
     if (!props.title || props.title.trim() === '') {
       throw new Error('StudySchedule title cannot be empty');
     }
-    if (props.targetExamDate && props.targetExamDate.getTime() <= Date.now()) {
-      throw new Error('Target exam date must be in the future');
-    }
+    const targetExamDate = isFutureDate(props.targetExamDate) ? props.targetExamDate : undefined;
 
     const now = new Date();
     return new StudySchedule({
       id: props.id || crypto.randomUUID(),
       studentId: props.studentId,
       title: props.title.trim(),
-      targetExamDate: props.targetExamDate,
+      targetExamDate,
       items: props.items ?? [],
       createdAt: now,
       updatedAt: now,

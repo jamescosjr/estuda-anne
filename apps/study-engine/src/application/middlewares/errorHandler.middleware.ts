@@ -1,13 +1,25 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
 
-export function errorHandler(error: FastifyError, _request: FastifyRequest, reply: FastifyReply) {
+function isZodError(error: unknown): error is ZodError {
   if (error instanceof ZodError) {
+    return true;
+  }
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as { name?: string }).name === 'ZodError' &&
+    (Array.isArray((error as { issues?: unknown }).issues) || Array.isArray((error as { errors?: unknown }).errors))
+  );
+}
+
+export function errorHandler(error: FastifyError, _request: FastifyRequest, reply: FastifyReply) {
+  if (isZodError(error)) {
     reply.status(400).send({
       statusCode: 400,
       error: 'Bad Request',
       message: 'Validation failed',
-      details: error.errors,
+      details: error.errors ?? (error as ZodError).issues,
     });
     return;
   }

@@ -86,7 +86,7 @@ export class GenerateStudyScheduleUseCase {
   }
 
   private resolveTargetExamDate(input: GenerateStudyScheduleInput): Date | undefined {
-    if (input.targetExamDate) {
+    if (input.targetExamDate && !Number.isNaN(input.targetExamDate.getTime()) && input.targetExamDate.getTime() > Date.now()) {
       return input.targetExamDate;
     }
     if (!input.examDates || input.examDates.length === 0) {

@@ -1,7 +1,28 @@
+import { existsSync } from 'node:fs';
 import { FastifyInstance } from 'fastify';
 import { DailyBriefingListener } from '../listeners/DailyBriefingListener.js';
 
-const STUDY_ENGINE_URL = process.env.STUDY_ENGINE_URL || 'http://localhost:3002';
+function resolveStudyEngineUrl(): string {
+  const url = (process.env.STUDY_ENGINE_URL || 'http://localhost:3002').replace(/\/$/, '');
+  if (existsSync('/.dockerenv') && /localhost|127\.0\.0\.1/.test(url)) {
+    return url.replace(/localhost|127\.0\.0\.1/g, 'study-engine');
+  }
+  return url;
+}
+
+const STUDY_ENGINE_URL = resolveStudyEngineUrl();
+
+async function readEngineJson(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) {
+    return {};
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text.slice(0, 240) };
+  }
+}
 
 function normalizeClientFormat(format: string): string {
   const value = (format || '').toUpperCase();
@@ -260,14 +281,18 @@ export async function studyRoutes(app: FastifyInstance) {
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const data = await readEngineJson(res);
         return reply.status(200).send(data);
       }
 
-      const errJson = await res.json().catch(() => ({ message: 'Falha ao gerar cronograma' }));
+      const errJson = await readEngineJson(res);
       return reply.status(res.status).send(errJson);
     } catch (err: any) {
-      app.log.warn({ err }, 'Study Engine offline ao gerar cronograma');
+      app.log.warn({
+        err,
+        cause: err?.cause,
+        studyEngineUrl: STUDY_ENGINE_URL,
+      }, 'Study Engine offline ao gerar cronograma');
       return reply.status(503).send({
         error: 'StudyEngineUnavailable',
         message: 'Falha ao gerar cronograma no Study Engine',

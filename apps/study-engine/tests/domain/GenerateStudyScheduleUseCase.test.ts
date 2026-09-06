@@ -79,4 +79,48 @@ describe('GenerateStudyScheduleUseCase', () => {
     expect(schedule.items.some((item) => item.subject === 'Calculo I')).toBe(true);
     expect(schedule.items.some((item) => item.topic?.includes('Calculo I'))).toBe(true);
   });
+
+  it('gera plano de 7 dias quando a prova ja passou', async () => {
+    const scheduleRepository: IStudyScheduleRepository = {
+      save: vi.fn().mockResolvedValue(undefined),
+      findById: vi.fn(),
+      findByStudentId: vi.fn(),
+      update: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+    const materialRepository: IMaterialRepository = {
+      save: vi.fn(),
+      findById: vi.fn(),
+      findByStudentId: vi.fn().mockResolvedValue([]),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteManyByIds: vi.fn(),
+    };
+    const flashcardRepository: IFlashcardRepository = {
+      save: vi.fn(),
+      saveMany: vi.fn(),
+      findById: vi.fn(),
+      findByStudentId: vi.fn().mockResolvedValue([]),
+      findDueCards: vi.fn().mockResolvedValue([]),
+      findByMaterialId: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+
+    const useCase = new GenerateStudyScheduleUseCase(
+      scheduleRepository,
+      materialRepository,
+      flashcardRepository
+    );
+
+    const schedule = await useCase.execute({
+      studentId: 'usr-anne',
+      title: 'Cronograma — Engenharia',
+      targetExamDate: new Date('2020-01-01T00:00:00.000Z'),
+    });
+
+    expect(scheduleRepository.save).toHaveBeenCalledTimes(1);
+    expect(schedule.targetExamDate).toBeUndefined();
+    expect(schedule.items).toHaveLength(7);
+  });
 });

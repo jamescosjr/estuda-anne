@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -18,4 +19,25 @@ const envSchema = z.object({
   CLOUDFLARE_R2_ENDPOINT: z.string().optional(),
 });
 
-export const env = envSchema.parse(process.env);
+export function rewriteLocalMongoHostForDocker(uri: string, inDocker = existsSync('/.dockerenv')): string {
+  if (!inDocker || !uri) {
+    return uri;
+  }
+  try {
+    const parsed = new URL(uri);
+    if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+      parsed.hostname = 'mongodb';
+      return parsed.toString();
+    }
+  } catch {
+    return uri.replace('://localhost', '://mongodb').replace('://127.0.0.1', '://mongodb');
+  }
+  return uri;
+}
+
+const parsedEnv = envSchema.parse(process.env);
+
+export const env = {
+  ...parsedEnv,
+  MONGODB_URI: rewriteLocalMongoHostForDocker(parsedEnv.MONGODB_URI),
+};

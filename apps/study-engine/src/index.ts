@@ -197,14 +197,22 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  bootstrapStudyEngine().then((app) => {
-    const port = Number(process.env.STUDY_ENGINE_PORT) || 3002;
-    app.listen({ port, host: '0.0.0.0' }, (err, address) => {
-      if (err) {
-        app.log.error(err);
-        process.exit(1);
-      }
-      app.log.info(`Study Engine running at ${address}`);
+  bootstrapStudyEngine()
+    .then((app) => {
+      const port = Number(process.env.STUDY_ENGINE_PORT || process.env.PORT) || 3002;
+      app.listen({ port, host: '0.0.0.0' }, (err, address) => {
+        if (err) {
+          app.log.error(err);
+          process.exit(1);
+        }
+        app.log.info(`Study Engine running at ${address}`);
+      });
+    })
+    .catch((err) => {
+      console.error(JSON.stringify({
+        event: 'study_engine_bootstrap_failed',
+        message: err instanceof Error ? err.message : String(err),
+      }));
+      process.exit(1);
     });
-  });
 }
