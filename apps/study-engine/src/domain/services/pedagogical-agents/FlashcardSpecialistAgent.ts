@@ -12,11 +12,20 @@ export class FlashcardSpecialistAgent {
     materialId: string,
     studentId: string,
     rawText: string,
-    keyConcepts: readonly string[]
+    keyConcepts: readonly string[],
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>
   ): Promise<Flashcard[]> {
-    const generatedCards = await this.aiService.generateFlashcards(rawText, 5);
+    const existingCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
+    const existingFronts = existingCards.map(c => c.front);
 
-    const seenFronts = new Set<string>();
+    const generatedCards = await this.aiService.generateFlashcards(
+      rawText,
+      5,
+      existingFronts,
+      focusTopics
+    );
+
+    const seenFronts = new Set(existingFronts.map(f => f.trim().toLowerCase()));
     const uniqueCards = generatedCards.filter((c) => {
       const norm = c.front.trim().toLowerCase();
       if (seenFronts.has(norm)) return false;

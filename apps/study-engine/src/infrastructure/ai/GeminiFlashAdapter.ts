@@ -70,16 +70,26 @@ ${content.slice(0, 10000)}`;
     };
   }
 
-  public async generateFlashcards(content: string, count = 5): Promise<GeneratedFlashcardDTO[]> {
+  public async generateFlashcards(
+    content: string,
+    count = 5,
+    existingPrompts?: string[],
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+  ): Promise<GeneratedFlashcardDTO[]> {
     if (!this.apiKey) {
       const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
       const cards: GeneratedFlashcardDTO[] = [];
       const distinctTopics = Array.from(new Set(sentences));
 
+      const existingSet = new Set((existingPrompts || []).map(p => p.trim().toLowerCase()));
+
       for (let i = 0; i < Math.min(count, Math.max(3, distinctTopics.length)); i++) {
         const topic = distinctTopics[i] || `Conceito fundamental ${i + 1}`;
+        const front = `[Gatilho] O que caracteriza: ${topic.slice(0, 45)}?`;
+        if (existingSet.has(front.toLowerCase())) continue;
+
         cards.push({
-          front: `[Gatilho] O que caracteriza: ${topic.slice(0, 45)}?`,
+          front,
           back: `Refere-se ao conceito chave de ${topic.slice(0, 40)}. Garante a compreensão atômica e retenção do conteúdo.`,
         });
       }
@@ -100,13 +110,21 @@ ${content.slice(0, 10000)}`;
       ];
     }
 
+    const prohibitionBlock = existingPrompts && existingPrompts.length > 0
+      ? `\nPROIBIÇÃO DE REPETIÇÃO (REGRA ABSOLUTA):\nNUNCA crie flashcards com enunciados ou conceitos iguais/semelhantes aos seguintes cards já respondidos pela aluna:\n${existingPrompts.slice(0, 25).map(p => `- "${p}"`).join('\n')}\n`
+      : '';
+
+    const focusBlock = focusTopics && focusTopics.length > 0
+      ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
+      : '';
+
     const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
-
+${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${count} flashcards com base estritamente no material acima.
+Gere ${count} flashcards inéditos com base estritamente no material acima.
 
 REGRAS PARA FLASHCARDS:
 1. Seja atômico: cada flashcard deve focar em apenas UM conceito chave.
@@ -145,7 +163,12 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
     return JSON.parse(textOutput);
   }
 
-  public async generateQuizQuestions(content: string, questionsCount = 4): Promise<GeneratedQuizQuestionDTO[]> {
+  public async generateQuizQuestions(
+    content: string,
+    questionsCount = 4,
+    existingPrompts?: string[],
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+  ): Promise<GeneratedQuizQuestionDTO[]> {
     if (!this.apiKey) {
       const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
       const questions: GeneratedQuizQuestionDTO[] = [];
@@ -153,7 +176,7 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
       for (let i = 0; i < questionsCount; i++) {
         const sentence = sentences[i % sentences.length] || `tópico de aplicação acadêmica ${i + 1}`;
         questions.push({
-          prompt: `[Estudo de Caso] Suponha que Anne precisa analisar o seguinte cenário prático relacionado a "${sentence.slice(0, 50)}...": qual a melhor decisão técnica e por quê?`,
+          prompt: `[Estudo de Caso ${i + 1}] Suponha que Anne precisa analisar o seguinte cenário prático relacionado a "${sentence.slice(0, 50)}...": qual a melhor decisão técnica e por quê?`,
           options: [
             `Aplicar o modelo direto, fundamentado em ${sentence.slice(0, 30)}.`,
             `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
@@ -168,13 +191,21 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
       return questions;
     }
 
+    const prohibitionBlock = existingPrompts && existingPrompts.length > 0
+      ? `\nPROIBIÇÃO DE REPETIÇÃO (REGRA ABSOLUTA):\nNUNCA crie perguntas iguais ou com enunciados parecidos/variações simples das seguintes perguntas já respondidas pela aluna:\n${existingPrompts.slice(0, 25).map(p => `- "${p}"`).join('\n')}\n`
+      : '';
+
+    const focusBlock = focusTopics && focusTopics.length > 0
+      ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% das questões) os tópicos de maior fragilidade/erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
+      : '';
+
     const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
-
+${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${questionsCount} quizzes com base estritamente no material acima.
+Gere ${questionsCount} quizzes inéditos com base estritamente no material acima.
 
 REGRAS PARA QUIZZES (Múltipla Escolha):
 1. Crie cenários práticos ou estudos de caso sempre que possível, forçando o pensamento crítico (nível de "Aplicação" e "Análise" da Taxonomia de Bloom).

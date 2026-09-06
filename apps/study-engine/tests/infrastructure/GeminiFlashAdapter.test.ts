@@ -33,7 +33,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
 
       expect(quiz.length).toBe(2);
       for (const q of quiz) {
-        expect(q.prompt).toContain('[Estudo de Caso]');
+        expect(q.prompt).toContain('Estudo de Caso');
         expect(q.options.length).toBe(4);
         expect(q.correctAnswerIndex).toBeGreaterThanOrEqual(0);
         expect(q.correctAnswerIndex).toBeLessThanOrEqual(3);

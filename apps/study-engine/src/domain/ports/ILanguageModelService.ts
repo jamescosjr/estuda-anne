@@ -38,8 +38,18 @@ export interface ParsedScheduleAnalysisResult {
 
 export interface ILanguageModelService {
   extractConceptsAndSummary(content: string): Promise<MaterialAnalysisResult>;
-  generateFlashcards(content: string, count?: number): Promise<GeneratedFlashcardDTO[]>;
-  generateQuizQuestions(content: string, questionsCount?: number): Promise<GeneratedQuizQuestionDTO[]>;
+  generateFlashcards(
+    content: string,
+    count?: number,
+    existingPrompts?: string[],
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+  ): Promise<GeneratedFlashcardDTO[]>;
+  generateQuizQuestions(
+    content: string,
+    questionsCount?: number,
+    existingPrompts?: string[],
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+  ): Promise<GeneratedQuizQuestionDTO[]>;
   analyzeScheduleImageOrDocument(fileData: { mimeType?: string; dataBase64?: string; textContent?: string }): Promise<ParsedScheduleAnalysisResult>;
   generateDailyBriefingStream(
     studentName: string,
