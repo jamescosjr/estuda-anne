@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/lib/auth-context'
+import { DailyBriefingCard } from './daily-briefing-card'
 
 const eventTypeLabels: Record<string, string> = {
   quiz: 'Quiz',
@@ -62,6 +63,9 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Daily Briefing Card - Boas-vindas Inteligente com Streaming SSE */}
+      <DailyBriefingCard />
+
       {/* Banner de Saudação Personalizado */}
       <Card className="overflow-hidden">
         <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">

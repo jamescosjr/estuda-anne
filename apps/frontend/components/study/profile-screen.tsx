@@ -375,7 +375,7 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
                     subjects.map((sub) => (
                       <Badge
                         key={sub}
-                        variant="outline"
+                        variant="neutral"
                         className="flex items-center gap-1.5 bg-muted/50 py-1.5 pl-3 pr-2 text-xs font-medium rounded-lg"
                       >
                         {sub}

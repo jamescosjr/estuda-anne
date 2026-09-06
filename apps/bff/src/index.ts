@@ -4,12 +4,14 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { studyRoutes } from './application/routes/studyRoutes.js';
 import { authRoutes } from './application/routes/authRoutes.js';
+import { DailyBriefingListener } from './application/listeners/DailyBriefingListener.js';
 
 dotenv.config();
 dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 
 export async function bootstrapBFF() {
   const app = Fastify({ logger: true, ignoreTrailingSlash: true });
+  DailyBriefingListener.initialize();
 
   await app.register(cors, {
     origin: (origin, cb) => {

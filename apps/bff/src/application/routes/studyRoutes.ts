@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { DailyBriefingListener } from '../listeners/DailyBriefingListener.js';
 
 const STUDY_ENGINE_URL = process.env.STUDY_ENGINE_URL || 'http://localhost:3002';
 
@@ -300,5 +301,70 @@ export async function studyRoutes(app: FastifyInstance) {
       preferredStyleHints: [],
       adaptivePromptInstruction: 'Perfil adaptativo do estudante inicializado.',
     });
+  });
+
+  // Rota SSE de Streaming para o Briefing Diário de Boas-vindas Inteligente
+  app.get('/api/daily-briefing', async (request, reply) => {
+    const { studentId = 'anne-student-1', name = 'Anne' } = (request.query as any) || {};
+
+    reply.raw.setHeader('Content-Type', 'text/event-stream');
+    reply.raw.setHeader('Cache-Control', 'no-cache');
+    reply.raw.setHeader('Connection', 'keep-alive');
+    reply.raw.setHeader('Access-Control-Allow-Origin', '*');
+
+    const context = DailyBriefingListener.getContext(studentId);
+    const studentName = name || context?.studentName || 'Anne';
+    const dueCount = context?.dueFlashcardsCount ?? 15;
+    const events = context?.todayEvents ?? ['Revisão espaçada de Cálculo I', 'Quiz de Algoritmos'];
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    let briefingText = '';
+
+    if (apiKey) {
+      try {
+        const prompt = `Você é um mentor universitário especialista e empático para a estudante ${studentName}.
+Gere um briefing matinal curto (máximo 3 frases) de boas-vindas para o dashboard.
+
+DADOS:
+- Nome: ${studentName}
+- Flashcards para revisar hoje: ${dueCount}
+- Atividades do dia: ${events.join(', ')}
+
+Exemplo: "Oi Anne, bom dia! Vi que temos 15 flashcards de Cálculo pendentes para hoje. Que tal iniciar sua revisão em blocos de 15 minutos para maximizar a retenção?"`;
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.6 },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          briefingText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        }
+      } catch (err) {
+        app.log.warn({ err }, 'Erro ao gerar briefing no Gemini, usando fallback de streaming local');
+      }
+    }
+
+    if (!briefingText) {
+      briefingText = `Oi ${studentName}, bom dia! Vi que temos ${dueCount} flashcards pendentes e revisões de ${events.slice(0, 2).join(' e ')} programadas para hoje. Sugiro iniciar com um bloco de 15 minutos de estudo ativo!`;
+    }
+
+    const words = briefingText.split(' ');
+    for (const word of words) {
+      const chunk = word + ' ';
+      reply.raw.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+      await new Promise((r) => setTimeout(r, 30));
+    }
+
+    reply.raw.write('data: [DONE]\n\n');
+    reply.raw.end();
   });
 }

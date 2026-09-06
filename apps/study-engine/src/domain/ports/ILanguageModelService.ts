@@ -41,4 +41,9 @@ export interface ILanguageModelService {
   generateFlashcards(content: string, count?: number): Promise<GeneratedFlashcardDTO[]>;
   generateQuizQuestions(content: string, questionsCount?: number): Promise<GeneratedQuizQuestionDTO[]>;
   analyzeScheduleImageOrDocument(fileData: { mimeType?: string; dataBase64?: string; textContent?: string }): Promise<ParsedScheduleAnalysisResult>;
+  generateDailyBriefingStream(
+    studentName: string,
+    metrics: { dueFlashcardsCount: number; todayEvents: string[] },
+    onChunk: (chunk: string) => void
+  ): Promise<string>;
 }

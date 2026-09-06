@@ -309,4 +309,71 @@ Formato JSON estrito esperado:
       suggestedScheduleEvents: parsed.suggestedScheduleEvents || [],
     };
   }
+
+  public async generateDailyBriefingStream(
+    studentName: string,
+    metrics: { dueFlashcardsCount: number; todayEvents: string[] },
+    onChunk: (chunk: string) => void
+  ): Promise<string> {
+    const prompt = `Você é um mentor universitário empático e focado na aprendizagem ativa para a estudante ${studentName}.
+Elabore um briefing matinal curto (2 a 3 frases) encorajador e prático.
+
+DADOS DA ESTUDANTE:
+- Nome: ${studentName}
+- Flashcards pendentes hoje: ${metrics.dueFlashcardsCount}
+- Compromissos/Revisões do dia: ${metrics.todayEvents.join(', ') || 'Revisões regulares'}
+
+Instruções:
+- Comece com uma saudação calorosa.
+- Destaque as revisões pendentes e oriente a priorização.
+- Seja direto, motivador e focado em estudo espaçado.`;
+
+    let fullText = '';
+    if (!this.apiKey) {
+      // Fallback de streaming determinístico rápido em milissegundos para dev/offline
+      const fallbackText = `Oi ${studentName}, bom dia! Vi que você tem ${metrics.dueFlashcardsCount} flashcards pendentes de revisão e compromissos importantes hoje (${metrics.todayEvents.slice(0, 2).join(', ')}). Sugiro focar em 15 minutos de estudo ativo espaçado para garantir a retenção máxima!`;
+      const words = fallbackText.split(' ');
+      for (const word of words) {
+        const chunk = word + ' ';
+        fullText += chunk;
+        onChunk(chunk);
+        await new Promise(r => setTimeout(r, 25));
+      }
+      return fullText.trim();
+    }
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7 },
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Gemini API Error: ${response.status}`);
+      }
+
+      const data = await response.json() as any;
+      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      fullText = textOutput;
+
+      const words = textOutput.split(' ');
+      for (const word of words) {
+        const chunk = word + ' ';
+        onChunk(chunk);
+        await new Promise(r => setTimeout(r, 20));
+      }
+      return fullText;
+    } catch {
+      const fallbackText = `Oi ${studentName}, bom dia! Vamos iniciar a rotina de hoje com ${metrics.dueFlashcardsCount} flashcards e foco na retenção ativa!`;
+      onChunk(fallbackText);
+      return fallbackText;
+    }
+  }
 }
