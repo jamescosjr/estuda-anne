@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { z } from 'zod';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -9,7 +8,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '../../.env') });
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3002),
-  MONGODB_URI: z.string().default('mongodb://localhost:27017/estuda_anne'),
+  MONGODB_URI: z.string().min(1),
   GEMINI_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   CLOUDFLARE_R2_ACCOUNT_ID: z.string().optional(),
@@ -19,59 +18,4 @@ const envSchema = z.object({
   CLOUDFLARE_R2_ENDPOINT: z.string().optional(),
 });
 
-const DOCKER_MONGO_URI = 'mongodb://mongodb:27017/estuda-anne';
-
-function isLocalMongoHost(hostname: string): boolean {
-  return hostname === 'localhost' || hostname === '127.0.0.1';
-}
-
-export function rewriteLocalMongoHostForDocker(uri: string, inDocker = existsSync('/.dockerenv')): string {
-  if (!inDocker || !uri) {
-    return uri;
-  }
-  try {
-    const parsed = new URL(uri);
-    if (isLocalMongoHost(parsed.hostname)) {
-      parsed.hostname = 'mongodb';
-      return parsed.toString();
-    }
-  } catch {
-    return uri.replace('://localhost', '://mongodb').replace('://127.0.0.1', '://mongodb');
-  }
-  return uri;
-}
-
-export function mongoUriCandidates(uri: string): string[] {
-  const candidates: string[] = [];
-  const add = (value: string) => {
-    if (value && !candidates.includes(value)) {
-      candidates.push(value);
-    }
-  };
-
-  let hostname = '';
-  try {
-    hostname = new URL(uri).hostname;
-  } catch {
-    hostname = '';
-  }
-
-  const dockerized = rewriteLocalMongoHostForDocker(uri, true);
-  if (isLocalMongoHost(hostname) || /localhost|127\.0\.0\.1/.test(uri)) {
-    add(dockerized);
-    add(uri);
-  } else {
-    add(uri);
-    add(dockerized);
-  }
-  add(DOCKER_MONGO_URI);
-  return candidates;
-}
-
-const parsedEnv = envSchema.parse(process.env);
-const inContainer = existsSync('/.dockerenv') || process.env.NODE_ENV === 'production';
-
-export const env = {
-  ...parsedEnv,
-  MONGODB_URI: rewriteLocalMongoHostForDocker(parsedEnv.MONGODB_URI, inContainer),
-};
+export const env = envSchema.parse(process.env);

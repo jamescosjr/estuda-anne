@@ -35,7 +35,7 @@ services:
     environment:
       - NODE_ENV=production
       - AUTH_SERVICE_PORT=3005
-      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
+      - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET:-secret_jwt_estuda_anne_key_2026}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@estuda-anne.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
@@ -59,7 +59,7 @@ services:
     environment:
       - NODE_ENV=production
       - STUDY_ENGINE_PORT=3002
-      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/estuda-anne}
+      - MONGODB_URI=${MONGODB_URI}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLOUDFLARE_R2_ACCOUNT_ID=${CLOUDFLARE_R2_ACCOUNT_ID}
       - CLOUDFLARE_R2_ACCESS_KEY_ID=${CLOUDFLARE_R2_ACCESS_KEY_ID}

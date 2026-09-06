@@ -1,9 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
-import { env, mongoUriCandidates } from '../../config/env.js';
-
-function redactMongoUri(uri: string): string {
-  return uri.replace(/\/\/([^@/]+)@/g, '//***@');
-}
+import { env } from '../../config/env.js';
 
 export class MongoConnection {
   private static instance: MongoConnection | null = null;
@@ -24,36 +20,19 @@ export class MongoConnection {
       return this.db;
     }
 
-    const candidates = mongoUriCandidates(uri);
-    let lastError: unknown;
+    this.client = new MongoClient(uri, {
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      serverSelectionTimeoutMS: 5000,
+    });
+    await this.client.connect();
+    this.db = this.client.db('estuda-anne');
 
-    for (const candidate of candidates) {
-      try {
-        this.client = new MongoClient(candidate, {
-          maxPoolSize: 10,
-          minPoolSize: 1,
-          serverSelectionTimeoutMS: 3000,
-        });
-        await this.client.connect();
-        this.db = this.client.db('estuda-anne');
-        await this.ensureIndexes();
-        return this.db;
-      } catch (err) {
-        lastError = err;
-        console.error(JSON.stringify({
-          event: 'mongodb_connect_failed',
-          uri: redactMongoUri(candidate),
-          message: err instanceof Error ? err.message : String(err),
-        }));
-        if (this.client) {
-          await this.client.close().catch(() => undefined);
-          this.client = null;
-        }
-        this.db = null;
-      }
+    if (!this.db) {
+      throw new Error('Database connection failed');
     }
-
-    throw lastError instanceof Error ? lastError : new Error('Database connection failed');
+    await this.ensureIndexes();
+    return this.db;
   }
 
   public getDb(): Db {
@@ -79,7 +58,6 @@ export class MongoConnection {
     if (!this.db) return;
 
     try {
-      // 1. Flashcards: Índice composto para revisões pendentes por aluna e data
       await this.db.collection('flashcards').createIndex(
         { studentId: 1, nextReviewDate: 1 },
         { name: 'idx_flashcards_student_due_date' }
@@ -89,7 +67,6 @@ export class MongoConnection {
         { name: 'idx_flashcards_material' }
       );
 
-      // 2. Materials: Índice por aluna e data de criação decrescente
       await this.db.collection('materials').createIndex(
         { studentId: 1, createdAt: -1 },
         { name: 'idx_materials_student_created' }
@@ -99,7 +76,6 @@ export class MongoConnection {
         { name: 'idx_materials_status' }
       );
 
-      // 3. Quizzes
       await this.db.collection('quizzes').createIndex(
         { materialId: 1 },
         { name: 'idx_quizzes_material' }
@@ -109,7 +85,6 @@ export class MongoConnection {
         { name: 'idx_quizzes_student' }
       );
 
-      // 4. Study Schedules — um plano ativo por aluna
       await this.db.collection('study_schedules').createIndex(
         { studentId: 1 },
         { name: 'idx_schedules_active_student', unique: true }
