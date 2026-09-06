@@ -29,19 +29,24 @@ export class MongoConnection {
       return this.db;
     }
 
-    this.client = new MongoClient(uri, {
+    const client = new MongoClient(uri, {
       maxPoolSize: 10,
       minPoolSize: 1,
       serverSelectionTimeoutMS: 15000,
     });
-    await this.client.connect();
-    this.db = this.client.db(databaseNameFromUri(uri));
 
-    if (!this.db) {
-      throw new Error('Database connection failed');
+    try {
+      await client.connect();
+      this.client = client;
+      this.db = client.db(databaseNameFromUri(uri));
+      await this.ensureIndexes();
+      return this.db;
+    } catch (error) {
+      await client.close().catch(() => undefined);
+      this.client = null;
+      this.db = null;
+      throw error;
     }
-    await this.ensureIndexes();
-    return this.db;
   }
 
   public getDb(): Db {

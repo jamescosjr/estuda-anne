@@ -67,7 +67,7 @@ function createStorageProvider(): IStorageProvider {
 }
 
 export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Promise<FastifyInstance> {
-  const app = Fastify({ logger: true, ignoreTrailingSlash: true });
+  const app = Fastify({ logger: true, ignoreTrailingSlash: true, pluginTimeout: 120000 });
 
   await app.register(cors, {
     origin: (origin, cb) => {
@@ -219,6 +219,11 @@ async function connectPersistenceWithRetry(app: FastifyInstance): Promise<void> 
       app.log.info('Study Engine persistence routes registered');
       return;
     } catch (err) {
+      const code = err && typeof err === 'object' ? (err as { code?: string }).code : undefined;
+      if (code === 'AVV_ERR_ROOT_PLG_BOOTED') {
+        app.log.fatal({ err }, 'Rotas de persistencia nao podem ser registradas depois do listen');
+        throw err;
+      }
       app.log.error({ err }, 'MongoDB indisponivel; nova tentativa em 3s');
       await new Promise((resolve) => setTimeout(resolve, 3000));
     }
@@ -228,10 +233,10 @@ async function connectPersistenceWithRetry(app: FastifyInstance): Promise<void> 
 if (process.env.NODE_ENV !== 'test') {
   bootstrapStudyEngine({ connectMongo: false })
     .then(async (app) => {
+      await connectPersistenceWithRetry(app);
       const port = Number(process.env.STUDY_ENGINE_PORT || process.env.PORT) || 3002;
       await app.listen({ port, host: '0.0.0.0' });
       app.log.info(`Study Engine running at http://0.0.0.0:${port}`);
-      await connectPersistenceWithRetry(app);
     })
     .catch((err) => {
       console.error(JSON.stringify({

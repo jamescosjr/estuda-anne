@@ -307,6 +307,13 @@ export async function studyRoutes(app: FastifyInstance) {
       }
 
       const errJson = await readEngineJson(res);
+      if (res.status === 404) {
+        return reply.status(503).send({
+          error: 'StudyEngineUnavailable',
+          message: 'Falha ao gerar cronograma no Study Engine',
+          detail: 'Study Engine ainda nao registrou /schedule/generate',
+        });
+      }
       return reply.status(res.status).send(errJson);
     } catch (err: any) {
       const detail = engineFetchError(err);
