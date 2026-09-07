@@ -21,15 +21,21 @@ export class FlashcardSpecialistAgent {
     persist = true,
     cacheHandle?: ContextCacheHandle | null
   ): Promise<Flashcard[]> {
-    const existingCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
-    const existingFronts = existingCards.map(c => c.front);
+    const existingMaterialCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
+    const studentCards = (await this.flashcardRepository.findByStudentId?.(studentId, 50)) || [];
+    const existingFronts = Array.from(
+      new Set([
+        ...existingMaterialCards.map(c => c.front),
+        ...studentCards.map(c => c.front),
+      ])
+    );
 
     const generatedCards = await this.aiService.generateFlashcards(
       rawText,
       5,
       existingFronts,
       focusTopics,
-      { cacheHandle }
+      { cacheHandle, keyConcepts }
     );
 
     const accumulatedFronts: string[] = [...existingFronts];

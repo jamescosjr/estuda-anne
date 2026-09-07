@@ -333,7 +333,7 @@ describe('ProcessMaterialUseCase', () => {
       5,
       [],
       expect.any(Array),
-      { cacheHandle: mockCacheHandle }
+      { cacheHandle: mockCacheHandle, keyConcepts: ['incerteza', 'heisenberg'] }
     );
     expect(aiService.generateQuizQuestions).toHaveBeenCalledWith(
       expect.any(String),

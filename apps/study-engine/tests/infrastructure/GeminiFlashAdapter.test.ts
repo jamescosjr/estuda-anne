@@ -92,7 +92,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       const cards = await adapter.generateFlashcards(sampleMaterial, 1);
 
       expect(mockFetch).toHaveBeenCalledOnce();
-      expect(capturedRequestBody.generationConfig.temperature).toBe(0.6);
+      expect(capturedRequestBody.generationConfig.temperature).toBe(0.7);
       expect(capturedRequestBody.generationConfig.responseMimeType).toBe('application/json');
 
       const promptText = capturedRequestBody.contents[0].parts[0].text;

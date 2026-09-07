@@ -308,41 +308,54 @@ ${content.slice(0, 10000)}`;
     count = 5,
     existingPrompts?: string[],
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
-    options?: { cacheHandle?: ContextCacheHandle | null }
+    options?: { cacheHandle?: ContextCacheHandle | null; keyConcepts?: readonly string[] }
   ): Promise<GeneratedFlashcardDTO[]> {
     if (!this.apiKey) {
+      const concepts = options?.keyConcepts || [];
       const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
       const cards: GeneratedFlashcardDTO[] = [];
-      const distinctTopics = Array.from(new Set(sentences));
-
+      const distinctTopics = Array.from(new Set(concepts.length > 0 ? concepts : sentences));
       const existingSet = new Set((existingPrompts || []).map(p => p.trim().toLowerCase()));
+
+      const triggers = [
+        (topic: string) => `[Definição] Qual a caracterização atômica de: ${topic.slice(0, 45)}?`,
+        (topic: string) => `[Mecanismo] Como opera o processo de: ${topic.slice(0, 45)}?`,
+        (topic: string) => `[Aplicação] De que maneira o fundamento de ${topic.slice(0, 35)} se aplica na prática?`,
+        (topic: string) => `[Causa & Efeito] Qual o impacto direto de ${topic.slice(0, 35)} no resultado do sistema?`,
+        (topic: string) => `[Limitação] Qual a condição limite ou ponto crítico em relação a ${topic.slice(0, 35)}?`,
+      ];
 
       for (let i = 0; i < Math.min(count, Math.max(3, distinctTopics.length)); i++) {
         const topic = distinctTopics[i] || `Conceito fundamental ${i + 1}`;
-        const front = `[Gatilho] O que caracteriza: ${topic.slice(0, 45)}?`;
+        const triggerFn = triggers[i % triggers.length];
+        const front = triggerFn(topic);
         if (existingSet.has(front.toLowerCase())) continue;
 
         cards.push({
           front,
-          back: `Refere-se ao conceito chave de ${topic.slice(0, 40)}. Garante a compreensão atômica e retenção do conteúdo.`,
+          back: `Explicação do conceito chave de ${topic.slice(0, 40)}. Assegura retenção e compreensão atômica sem ambiguidades.`,
         });
       }
 
       return cards.length > 0 ? cards : [
         {
-          front: 'Qual a definição atômica do conceito principal?',
+          front: '[Definição] Qual a definição atômica do conceito principal da matéria?',
           back: content.slice(0, 100).trim() + '.',
         },
         {
-          front: 'Como aplicar este fundamento na prática?',
+          front: '[Mecanismo] Como aplicar este fundamento na prática acadêmica?',
           back: 'Relacionando os axiomas teóricos com resolução ativa de problemas.',
         },
         {
-          front: 'Qual o ponto crítico de diferenciação entre os modelos?',
+          front: '[Diferenciação] Qual o ponto crítico de diferenciação entre os modelos?',
           back: 'A abrangência analítica e a eficiência no diagnóstico de resultados.',
         },
       ];
     }
+
+    const conceptsBlock = options?.keyConcepts && options.keyConcepts.length > 0
+      ? `\nCONCEITOS-CHAVE OBRIGATÓRIOS DO MATERIAL:\nExplore obrigatoriamente e com profundidade os seguintes conceitos específicos deste material:\n${options.keyConcepts.map(c => `- ${c}`).join('\n')}\n`
+      : '';
 
     const prohibitionBlock = existingPrompts && existingPrompts.length > 0
       ? `\nPROIBIÇÃO DE REPETIÇÃO (REGRA ABSOLUTA):\nNUNCA crie flashcards com enunciados ou conceitos iguais/semelhantes aos seguintes cards já respondidos pela aluna:\n${existingPrompts.slice(0, 25).map(p => `- "${p}"`).join('\n')}\n`
@@ -357,21 +370,28 @@ ${content.slice(0, 10000)}`;
       const model = genAI.getGenerativeModelFromCachedContent(options.cacheHandle.cache as any, {
         generationConfig: {
           responseMimeType: 'application/json',
-          temperature: 0.6,
+          temperature: 0.7,
         },
       });
 
       const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO do material em cache, nunca sobre o documento.
 
+MATRIZ DE DIVERSIDADE PEDAGÓGICA (Obrigatório distribuir os ${count} flashcards entre estes ângulos cognitivos):
+- CARD 1 (Definição & Conceito Fundamental): Foque na essência teórica e significado atômico do principal conceito.
+- CARD 2 (Mecanismo & Funcionamento Interno): Explique o 'como funciona' ou o processo interno por trás do conceito.
+- CARD 3 (Causa & Efeito / Relação): Aborde o impacto, consequência ou relação direta entre elementos da disciplina.
+- CARD 4 (Aplicação Prática / Resolução de Problema): Como o fundamento é aplicado em um cenário ou problema real da matéria.
+- CARD 5 (Diferenciação / Limitação / Ponto Crítico): Destaque a diferença entre conceitos parecidos, exceção ou condição limite.
+
 REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
-1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo. NUNCA gere flashcards parecidos ou redundantes.
-2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas.
+1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo. NUNCA gere flashcards parecidos ou repetitivos. Varia obrigatoriamente os gatilhos dos enunciados (ex: "Qual o mecanismo...", "Como o princípio X afeta Y...", "Qual a diferença crítica entre...", "Em que condição ocorre..."). PROIBIDO usar "O que é X?" em todos os cartões.
+2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas. A pergunta contextualiza o tema sem depender de texto externo. O verso deve ser direto e pedagogicamente rico (2 a 3 frases explicativas).
 3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado" ou "autor".
 4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
-${prohibitionBlock}${focusBlock}
+${conceptsBlock}${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${count} flashcards profissionais, distintos e auto-contidos sobre a disciplina.
+Gere ${count} flashcards profissionais, distintos, variados e auto-contidos sobre a disciplina.
 
 ESTRUTURA E FORMATO DE SAÍDA:
 Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
@@ -390,17 +410,24 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO da matéria, nunca sobre o documento.
 
+MATRIZ DE DIVERSIDADE PEDAGÓGICA (Obrigatório distribuir os ${count} flashcards entre estes ângulos cognitivos):
+- CARD 1 (Definição & Conceito Fundamental): Foque na essência teórica e significado atômico do principal conceito.
+- CARD 2 (Mecanismo & Funcionamento Interno): Explique o 'como funciona' ou o processo interno por trás do conceito.
+- CARD 3 (Causa & Efeito / Relação): Aborde o impacto, consequência ou relação direta entre elementos da disciplina.
+- CARD 4 (Aplicação Prática / Resolução de Problema): Como o fundamento é aplicado em um cenário ou problema real da matéria.
+- CARD 5 (Diferenciação / Limitação / Ponto Crítico): Destaque a diferença entre conceitos parecidos, exceção ou condição limite.
+
 REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
-1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo (ex: 1. Definição do princípio; 2. Mecanismo de ação; 3. Relação de Causa e Efeito; 4. Aplicação acadêmica/prática; 5. Comparação ou Limitação). NUNCA gere flashcards parecidos ou redundantes.
+1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo. NUNCA gere flashcards parecidos ou repetitivos. Varia obrigatoriamente os gatilhos dos enunciados (ex: "Qual o mecanismo...", "Como o princípio X afeta Y...", "Qual a diferença crítica entre...", "Em que condição ocorre..."). PROIBIDO usar "O que é X?" em todos os cartões.
 2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas. A pergunta deve contextualizar o conceito sem depender de texto externo. O verso deve ser completo, claro e pedagogicamente rico (2 a 3 frases explicativas ou tópicos diretos).
 3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado", "conforme o texto", "de acordo com o texto" ou "autor". O flashcard deve tratar puramente da ciência/conceito da matéria.
 4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
-${prohibitionBlock}${focusBlock}
+${conceptsBlock}${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${count} flashcards profissionais, distintos e auto-contidos sobre a disciplina.
+Gere ${count} flashcards profissionais, distintos, variados e auto-contidos sobre a disciplina.
 
 ESTRUTURA E FORMATO DE SAÍDA:
 Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
@@ -420,7 +447,7 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             responseMimeType: 'application/json',
-            temperature: 0.6,
+            temperature: 0.7,
           },
         }),
       }

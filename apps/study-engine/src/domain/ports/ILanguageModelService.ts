@@ -70,7 +70,7 @@ export interface ILanguageModelService {
     count?: number,
     existingPrompts?: string[],
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
-    options?: { cacheHandle?: ContextCacheHandle | null }
+    options?: { cacheHandle?: ContextCacheHandle | null; keyConcepts?: readonly string[] }
   ): Promise<GeneratedFlashcardDTO[]>;
 
   generateQuizQuestions(
