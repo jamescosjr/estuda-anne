@@ -238,6 +238,27 @@ export async function studyRoutes(app: FastifyInstance) {
     }
   });
 
+  // Rota para Gerar Sessão Extra de Flashcards (reavalia perfil e gera novos flashcards persistidos)
+  app.post('/api/flashcards/extra-session', async (request, reply) => {
+    const { studentId = 'anne-student-1', subjectId, topic } = (request.body as any) || {};
+
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/extra-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, subjectId, topic }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao gerar sessão extra de flashcards' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(500).send({ error: 'InternalServerError', message: err.message });
+    }
+  });
+
   // Rota de Encerramento de Semestre (Rotina de Cleanup em lote)
   app.post('/api/semesters/close', async (request, reply) => {
     const { studentId } = (request.body as any) || {};
@@ -610,6 +631,27 @@ REGRAS RÍGIDAS:
         error: 'StudyEngineUnavailable',
         message: 'Falha ao avaliar quiz no Study Engine',
       });
+    }
+  });
+
+  // Rota para Gerar Sessão Extra de Quizzes (reavalia perfil e gera novas questões direcionadas)
+  app.post('/api/quizzes/extra-session', async (request, reply) => {
+    const { studentId = 'anne-student-1', subjectId, topic } = (request.body as any) || {};
+
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/quizzes/extra-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, subjectId, topic }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao gerar sessão extra de quizzes' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(500).send({ error: 'InternalServerError', message: err.message });
     }
   });
 }

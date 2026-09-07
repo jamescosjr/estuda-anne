@@ -8,5 +8,6 @@ export async function flashcardRoutes(
   const { controller } = options;
 
   app.get('/due', (req, reply) => controller.getDue(req, reply));
+  app.post('/extra-session', (req, reply) => controller.generateExtraSession(req, reply));
   app.post('/:id/review', (req, reply) => controller.review(req, reply));
 }

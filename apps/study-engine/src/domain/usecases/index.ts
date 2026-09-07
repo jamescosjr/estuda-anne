@@ -3,3 +3,4 @@ export * from './ReviewFlashcardUseCase.js';
 export * from './GetDueFlashcardsUseCase.js';
 export * from './GenerateStudyScheduleUseCase.js';
 export * from './CloseSemesterUseCase.js';
+export * from './GenerateExtraSessionUseCase.js';

@@ -7,5 +7,6 @@ export async function quizRoutes(
 ) {
   const { controller } = options;
   app.get('/', (req, reply) => controller.listByStudent(req, reply));
+  app.post('/extra-session', (req, reply) => controller.generateExtraSession(req, reply));
   app.post('/:id/evaluate', (req, reply) => controller.evaluate(req, reply));
 }

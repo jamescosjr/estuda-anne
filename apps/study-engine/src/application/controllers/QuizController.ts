@@ -1,6 +1,7 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { EvaluateQuizUseCase } from '../../domain/usecases/EvaluateQuizUseCase.js';
+import { GenerateExtraSessionUseCase } from '../../domain/usecases/GenerateExtraSessionUseCase.js';
 import { IQuizRepository } from '../../domain/ports/IQuizRepository.js';
 
 const EvaluateQuizBodySchema = z.object({
@@ -16,10 +17,16 @@ const EvaluateQuizParamsSchema = z.object({
   id: z.string().min(1),
 });
 
+const ExtraSessionBodySchema = z.object({
+  studentId: z.string().min(1),
+  materialId: z.string().optional(),
+});
+
 export class QuizController {
   constructor(
     private readonly evaluateQuizUseCase: EvaluateQuizUseCase,
-    private readonly quizRepository?: IQuizRepository
+    private readonly quizRepository?: IQuizRepository,
+    private readonly extraSessionUseCase?: GenerateExtraSessionUseCase
   ) {}
 
   public async listByStudent(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -41,5 +48,25 @@ export class QuizController {
       answers: body.answers,
     });
     reply.status(200).send(result);
+  }
+
+  public async generateExtraSession(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    if (!this.extraSessionUseCase) {
+      reply.status(501).send({ message: 'GenerateExtraSessionUseCase indisponível' });
+      return;
+    }
+
+    const body = ExtraSessionBodySchema.parse(request.body);
+    const result = await this.extraSessionUseCase.execute({
+      studentId: body.studentId,
+      materialId: body.materialId,
+      targetType: 'quiz',
+    });
+
+    reply.status(201).send({
+      message: 'Sessão extra de quiz gerada e persistida com sucesso!',
+      weakTopics: result.weakTopics,
+      quiz: result.quiz ? result.quiz.toJSON() : null,
+    });
   }
 }

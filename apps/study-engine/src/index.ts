@@ -21,6 +21,8 @@ import { DeleteMaterialUseCase } from './domain/usecases/DeleteMaterialUseCase.j
 import { CloseSemesterUseCase } from './domain/usecases/CloseSemesterUseCase.js';
 import { EvaluateQuizUseCase } from './domain/usecases/EvaluateQuizUseCase.js';
 import { SubmitAIFeedbackUseCase } from './domain/usecases/SubmitAIFeedbackUseCase.js';
+import { GenerateExtraSessionUseCase } from './domain/usecases/GenerateExtraSessionUseCase.js';
+import { MongoStudentAdaptiveProfileRepository } from './infrastructure/persistence/mongo/repositories/MongoStudentAdaptiveProfileRepository.js';
 import { MaterialController } from './application/controllers/MaterialController.js';
 import { FlashcardController } from './application/controllers/FlashcardController.js';
 import { ScheduleController } from './application/controllers/ScheduleController.js';
@@ -132,6 +134,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
     const scheduleRepo = new MongoStudyScheduleRepository(db);
     const vectorRepo = new MongoVectorRepository(db);
     const feedbackRepo = new MongoAIFeedbackRepository(db);
+    const profileRepo = new MongoStudentAdaptiveProfileRepository(db);
     const storageProvider = createStorageProvider();
     const contentExtractor = new DocumentTextExtractor();
     const jobQueue = new InMemoryJobQueueAdapter();
@@ -172,7 +175,14 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       scheduleRepo
     );
     const analyzeScheduleFileUseCase = new AnalyzeScheduleFileUseCase(geminiAdapter);
-    const evaluateQuizUseCase = new EvaluateQuizUseCase(quizRepo);
+    const evaluateQuizUseCase = new EvaluateQuizUseCase(quizRepo, profileRepo);
+    const generateExtraSessionUseCase = new GenerateExtraSessionUseCase(
+      materialRepo,
+      flashcardRepo,
+      quizRepo,
+      geminiAdapter,
+      profileRepo
+    );
     const submitAIFeedbackUseCase = new SubmitAIFeedbackUseCase(feedbackRepo);
 
     jobQueue.registerHandler(async (payload) => {
@@ -191,14 +201,22 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       deleteMaterialUseCase,
       jobQueue
     );
-    const flashcardController = new FlashcardController(reviewFlashcardUseCase, getDueFlashcardsUseCase);
+    const flashcardController = new FlashcardController(
+      reviewFlashcardUseCase,
+      getDueFlashcardsUseCase,
+      generateExtraSessionUseCase
+    );
     const scheduleController = new ScheduleController(
       generateScheduleUseCase,
       completeScheduleItemUseCase,
       scheduleRepo,
       analyzeScheduleFileUseCase
     );
-    const quizController = new QuizController(evaluateQuizUseCase, quizRepo);
+    const quizController = new QuizController(
+      evaluateQuizUseCase,
+      quizRepo,
+      generateExtraSessionUseCase
+    );
     const semesterController = new SemesterController(closeSemesterUseCase);
     const feedbackController = new AIFeedbackController(submitAIFeedbackUseCase, feedbackRepo);
 
