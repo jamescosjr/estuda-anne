@@ -36,20 +36,51 @@ export interface ParsedScheduleAnalysisResult {
   }>;
 }
 
+export interface ContextCacheHandle {
+  cache: {
+    name: string;
+    model: string;
+    [key: string]: any;
+  };
+  file?: {
+    name: string;
+    uri?: string;
+    mimeType?: string;
+    [key: string]: any;
+  };
+}
+
 export interface ILanguageModelService {
-  extractConceptsAndSummary(content: string): Promise<MaterialAnalysisResult>;
+  createContextCache?(fileData: {
+    mimeType?: string;
+    dataBase64?: string;
+    textContent?: string;
+    fileName?: string;
+  }): Promise<ContextCacheHandle | null>;
+
+  deleteContextCache?(handle: ContextCacheHandle | null): Promise<void>;
+
+  extractConceptsAndSummary(
+    content: string,
+    options?: { cacheHandle?: ContextCacheHandle | null }
+  ): Promise<MaterialAnalysisResult>;
+
   generateFlashcards(
     content: string,
     count?: number,
     existingPrompts?: string[],
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    options?: { cacheHandle?: ContextCacheHandle | null }
   ): Promise<GeneratedFlashcardDTO[]>;
+
   generateQuizQuestions(
     content: string,
     questionsCount?: number,
     existingPrompts?: string[],
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    options?: { cacheHandle?: ContextCacheHandle | null }
   ): Promise<GeneratedQuizQuestionDTO[]>;
+
   analyzeScheduleImageOrDocument(fileData: { mimeType?: string; dataBase64?: string; textContent?: string }): Promise<ParsedScheduleAnalysisResult>;
   extractTextFromMultimodalDocument(fileData: { mimeType?: string; dataBase64?: string }): Promise<string>;
   generateDailyBriefingStream(

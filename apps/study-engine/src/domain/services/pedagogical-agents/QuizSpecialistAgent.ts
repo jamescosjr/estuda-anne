@@ -1,6 +1,6 @@
 import { Quiz } from '../../entities/Quiz.js';
 import { IQuizRepository } from '../../ports/IQuizRepository.js';
-import { ILanguageModelService } from '../../ports/ILanguageModelService.js';
+import { ILanguageModelService, ContextCacheHandle } from '../../ports/ILanguageModelService.js';
 import { isPedagogicallyOffTopic } from '../StudyCorpusSanitizer.js';
 
 export class QuizSpecialistAgent {
@@ -15,7 +15,8 @@ export class QuizSpecialistAgent {
     materialTitle: string,
     rawText: string,
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
-    persist = true
+    persist = true,
+    cacheHandle?: ContextCacheHandle | null
   ): Promise<Quiz | null> {
     const existingQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
     const existingPrompts = existingQuizzes.flatMap(q => q.questions.map(item => item.prompt));
@@ -24,7 +25,8 @@ export class QuizSpecialistAgent {
       rawText,
       4,
       existingPrompts,
-      focusTopics
+      focusTopics,
+      { cacheHandle }
     );
 
     if (!quizQuestions || quizQuestions.length === 0) return null;

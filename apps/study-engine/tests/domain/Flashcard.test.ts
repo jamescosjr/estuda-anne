@@ -94,8 +94,8 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
       back: 'Conceito fundamental.',
     });
 
-    expect(card.id).not.toContain('fc-gen-');
-    expect(card.id).not.toContain('fc-');
+    expect(card.id.startsWith('fc-gen-')).toBe(false);
+    expect(card.id.startsWith('fc-')).toBe(false);
     expect(card.id.length).toBeGreaterThan(20);
   });
 });

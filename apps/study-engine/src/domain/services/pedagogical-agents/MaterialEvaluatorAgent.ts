@@ -1,4 +1,4 @@
-import { ILanguageModelService, MaterialAnalysisResult } from '../../ports/ILanguageModelService.js';
+import { ILanguageModelService, MaterialAnalysisResult, ContextCacheHandle } from '../../ports/ILanguageModelService.js';
 import { IVectorRepository } from '../../ports/IVectorRepository.js';
 import { lexicalEmbedding } from '../LexicalEmbedding.js';
 
@@ -11,10 +11,11 @@ export class MaterialEvaluatorAgent {
   public async evaluateAndIndex(
     materialId: string,
     studentId: string,
-    rawText: string
+    rawText: string,
+    cacheHandle?: ContextCacheHandle | null
   ): Promise<MaterialAnalysisResult> {
-    // 1. Análise conceitual e resumo pedagógico com a IA
-    const analysis = await this.aiService.extractConceptsAndSummary(rawText);
+    // 1. Análise conceitual e resumo pedagógico com a IA (utilizando cache se fornecido)
+    const analysis = await this.aiService.extractConceptsAndSummary(rawText, { cacheHandle });
 
     // 2. Fragmentação do texto em chunks para o RAG do material
     const chunkSize = 600;

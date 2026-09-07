@@ -210,4 +210,54 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(mockFetch).toHaveBeenCalledOnce();
     });
   });
+
+  describe('Gemini Context Caching', () => {
+    const mockApiKey = 'test-cache-api-key';
+
+    it('deve usar o modelo via getGenerativeModelFromCachedContent quando cacheHandle for fornecido', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      summary: 'Resumo via cache de contexto.',
+                      keyConcepts: ['dijkstra', 'caminho minimo'],
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      });
+      vi.stubGlobal('fetch', mockFetch);
+
+      const adapter = new GeminiFlashAdapter(mockApiKey);
+
+      const cacheHandle = {
+        cache: {
+          name: 'cachedContents/test-123',
+          model: 'models/gemini-1.5-flash-001',
+        },
+        file: {
+          name: 'files/test-file-123',
+        },
+      };
+
+      const result = await adapter.extractConceptsAndSummary(sampleMaterial, { cacheHandle });
+      expect(result.summary).toBe('Resumo via cache de contexto.');
+      expect(result.keyConcepts).toEqual(['dijkstra', 'caminho minimo']);
+      expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    it('deve retornar null em createContextCache quando nao houver apiKey', async () => {
+      const offlineAdapter = new GeminiFlashAdapter('');
+      const handle = await offlineAdapter.createContextCache({ textContent: 'Algum texto' });
+      expect(handle).toBeNull();
+    });
+  });
 });

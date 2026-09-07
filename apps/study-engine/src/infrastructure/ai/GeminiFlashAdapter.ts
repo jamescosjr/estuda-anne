@@ -2,13 +2,14 @@ import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GoogleAIFileManager } from '@google/generative-ai/server';
+import { GoogleAIFileManager, GoogleAICacheManager } from '@google/generative-ai/server';
 import {
   ILanguageModelService,
   MaterialAnalysisResult,
   GeneratedFlashcardDTO,
   GeneratedQuizQuestionDTO,
   ParsedScheduleAnalysisResult,
+  ContextCacheHandle,
 } from '../../domain/ports/ILanguageModelService.js';
 import { env } from '../config/env.js';
 import { logStructured } from '../observability/structuredLog.js';
@@ -90,7 +91,123 @@ export class GeminiFlashAdapter implements ILanguageModelService {
     this.apiKey = apiKey;
   }
 
-  public async extractConceptsAndSummary(content: string): Promise<MaterialAnalysisResult> {
+  public async createContextCache(fileData: {
+    mimeType?: string;
+    dataBase64?: string;
+    textContent?: string;
+    fileName?: string;
+  }): Promise<ContextCacheHandle | null> {
+    if (!this.apiKey) {
+      return null;
+    }
+
+    const mimeType = fileData.mimeType || (fileData.dataBase64 ? 'application/pdf' : 'text/plain');
+    const extension = mimeType.includes('pdf')
+      ? '.pdf'
+      : mimeType.includes('png')
+      ? '.png'
+      : mimeType.includes('jpg') || mimeType.includes('jpeg')
+      ? '.jpg'
+      : '.txt';
+
+    const tempFilePath = join(
+      tmpdir(),
+      `cache_upload_${Date.now()}_${Math.random().toString(36).substring(7)}${extension}`
+    );
+
+    let uploadedFile: { name: string; uri: string; mimeType: string } | null = null;
+    const fileManager = new GoogleAIFileManager(this.apiKey);
+    const cacheManager = new GoogleAICacheManager(this.apiKey);
+
+    try {
+      if (fileData.dataBase64) {
+        const buffer = Buffer.from(fileData.dataBase64, 'base64');
+        writeFileSync(tempFilePath, buffer);
+      } else if (fileData.textContent) {
+        writeFileSync(tempFilePath, fileData.textContent, 'utf-8');
+      } else {
+        return null;
+      }
+
+      // 1. Upload do arquivo via GoogleAIFileManager
+      const uploadResult = await fileManager.uploadFile(tempFilePath, {
+        mimeType,
+        displayName: fileData.fileName || 'Estuda Anne Material',
+      });
+      uploadedFile = uploadResult.file;
+
+      // 2. Criação do Cache via GoogleAICacheManager (10 min TTL)
+      const cache = await cacheManager.create({
+        model: 'models/gemini-1.5-flash-001',
+        contents: [
+          {
+            role: 'user',
+            parts: [{ fileData: { mimeType: uploadedFile.mimeType, fileUri: uploadedFile.uri } }],
+          },
+        ],
+        ttlSeconds: 600,
+      });
+
+      return {
+        cache,
+        file: uploadedFile,
+      };
+    } catch (error) {
+      logStructured({
+        service: 'study-engine',
+        event: 'gemini_cache_create_error',
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      if (uploadedFile?.name) {
+        try {
+          await fileManager.deleteFile(uploadedFile.name);
+        } catch {}
+      }
+      return null;
+    } finally {
+      if (existsSync(tempFilePath)) {
+        try {
+          unlinkSync(tempFilePath);
+        } catch {}
+      }
+    }
+  }
+
+  public async deleteContextCache(handle: ContextCacheHandle | null): Promise<void> {
+    if (!handle || !this.apiKey) return;
+    const cacheManager = new GoogleAICacheManager(this.apiKey);
+    const fileManager = new GoogleAIFileManager(this.apiKey);
+
+    if (handle.cache?.name) {
+      try {
+        await cacheManager.delete(handle.cache.name);
+      } catch (error) {
+        logStructured({
+          service: 'study-engine',
+          event: 'gemini_cache_delete_error',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (handle.file?.name) {
+      try {
+        await fileManager.deleteFile(handle.file.name);
+      } catch (error) {
+        logStructured({
+          service: 'study-engine',
+          event: 'gemini_file_delete_error',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  public async extractConceptsAndSummary(
+    content: string,
+    options?: { cacheHandle?: ContextCacheHandle | null }
+  ): Promise<MaterialAnalysisResult> {
     if (!this.apiKey) {
       // Fallback determinístico para desenvolvimento e testes locais de baixo custo
       const sampleSentences = content.split('.').filter(s => s.trim().length > 10);
@@ -110,7 +227,38 @@ export class GeminiFlashAdapter implements ILanguageModelService {
       };
     }
 
-    // Chamada HTTP otimizada para o Gemini Flash via API REST (baixo overhead, sem sdk pesado)
+    if (options?.cacheHandle?.cache) {
+      const genAI = new GoogleGenerativeAI(this.apiKey);
+      const model = genAI.getGenerativeModelFromCachedContent(options.cacheHandle.cache as any, {
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning.
+Analise o material de estudo enviado no contexto em cache.
+Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
+
+REGRAS DE QUALIDADE:
+- Resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
+- Até 5 conceitos-chave essenciais, priorizando os que mais caem em prova.
+- Evite jargões desnecessários.
+
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
+
+Formato esperado:
+{"summary": "...", "keyConcepts": ["..."]}`;
+
+      const result = await model.generateContent(prompt);
+      const textOutput = result.response.text();
+      const parsed = JSON.parse(textOutput);
+
+      return {
+        summary: parsed.summary,
+        keyConcepts: parsed.keyConcepts ?? [],
+      };
+    }
+
+    // Chamada HTTP otimizada para o Gemini Flash via API REST (fallback sem cache)
     const prompt = `Você é um coordenador pedagógico especialista em microlearning.
 Analise o seguinte material de estudo universitário.
 Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
@@ -159,7 +307,8 @@ ${content.slice(0, 10000)}`;
     content: string,
     count = 5,
     existingPrompts?: string[],
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    options?: { cacheHandle?: ContextCacheHandle | null }
   ): Promise<GeneratedFlashcardDTO[]> {
     if (!this.apiKey) {
       const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
@@ -202,6 +351,41 @@ ${content.slice(0, 10000)}`;
     const focusBlock = focusTopics && focusTopics.length > 0
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
+
+    if (options?.cacheHandle?.cache) {
+      const genAI = new GoogleGenerativeAI(this.apiKey);
+      const model = genAI.getGenerativeModelFromCachedContent(options.cacheHandle.cache as any, {
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.6,
+        },
+      });
+
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
+Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO do material em cache, nunca sobre o documento.
+
+REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
+1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo. NUNCA gere flashcards parecidos ou redundantes.
+2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas.
+3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado" ou "autor".
+4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
+${prohibitionBlock}${focusBlock}
+TAREFA:
+Gere ${count} flashcards profissionais, distintos e auto-contidos sobre a disciplina.
+
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
+[
+  {
+    "front": "...",
+    "back": "..."
+  }
+]`;
+
+      const result = await model.generateContent(prompt);
+      const textOutput = result.response.text();
+      return JSON.parse(textOutput);
+    }
 
     const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO da matéria, nunca sobre o documento.
@@ -255,7 +439,8 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     content: string,
     questionsCount = 4,
     existingPrompts?: string[],
-    focusTopics?: Array<{ topic: string; priorityWeight: number }>
+    focusTopics?: Array<{ topic: string; priorityWeight: number }>,
+    options?: { cacheHandle?: ContextCacheHandle | null }
   ): Promise<GeneratedQuizQuestionDTO[]> {
     if (!this.apiKey) {
       const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
@@ -263,16 +448,22 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
 
       for (let i = 0; i < questionsCount; i++) {
         const sentence = sentences[i % sentences.length] || `tópico de aplicação acadêmica ${i + 1}`;
+        const targetIndex = i % 4;
+        const correctText = `A afirmação descreve um fundamento do conteúdo: ${sentence.slice(0, 40)}.`;
+        const distractors = [
+          `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
+          `Confundir a hipótese de partida com o resultado de amostragem secundário.`,
+          `Desconsiderar as restrições operacionais e atuar apenas no escopo teórico.`,
+        ];
+
+        const optionsArr = [...distractors];
+        optionsArr.splice(targetIndex, 0, correctText);
+
         questions.push({
           prompt: `Segundo o material, o que é correto sobre: "${sentence.slice(0, 80)}"?`,
-          options: [
-            `A afirmação descreve um fundamento do conteúdo: ${sentence.slice(0, 40)}.`,
-            `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
-            `Confundir a hipótese de partida com o resultado de amostragem secundário.`,
-            `Desconsiderar as restrições operacionais e atuar apenas no escopo teórico.`,
-          ],
-          correctAnswerIndex: 0,
-          explanation: `A alternativa correta aplica diretamente os princípios de ${sentence.slice(0, 30)}. A segunda opção é incorreta pois desconsidera o rigor técnico necessário no cenário.`,
+          options: optionsArr,
+          correctAnswerIndex: targetIndex,
+          explanation: `A alternativa correta (${String.fromCharCode(65 + targetIndex)}) aplica diretamente os princípios de ${sentence.slice(0, 30)}. As demais opções são distratoras teóricas incorretas.`,
         });
       }
 
@@ -287,13 +478,88 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% das questões) os tópicos de maior fragilidade/erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um coordenador pedagógico especialista em microlearning. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
+    if (options?.cacheHandle?.cache) {
+      const genAI = new GoogleGenerativeAI(this.apiKey);
+      const model = genAI.getGenerativeModelFromCachedContent(options.cacheHandle.cache as any, {
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.6,
+        },
+      });
+
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO do material em cache.
 
 REGRAS DE QUALIDADE:
 1. As perguntas devem ser curtas e instigantes.
 2. Evite jargões desnecessários.
 3. Alternativas incorretas devem ser confusões reais da disciplina.
-4. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
+4. VARIABILIDADE DA RESPOSTA CORRETA (MUITO IMPORTANTE): Distribua a alternativa correta de forma variada e equilibrada entre as posições 0, 1, 2 e 3 (Opções A, B, C e D). NUNCA coloque a resposta certa sempre na opção 0 / Opção A.
+5. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
+${prohibitionBlock}${focusBlock}
+TAREFA:
+Gere ${questionsCount} questões de múltipla escolha inéditas cobrindo o material.
+
+DISTRIBUIÇÃO:
+- ~50% recordação/compreensão dos conceitos-chave.
+- ~30% aplicação.
+- ~20% análise.
+
+PROIBIDO:
+- Mencionar "Anne", a aluna, ou transformar a estudante em personagem.
+- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura técnica de contêiner de arquivo.
+
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
+[
+  {
+    "prompt": "...",
+    "options": ["opcao A", "opcao B", "opcao C", "opcao D"],
+    "correctAnswerIndex": 2,
+    "explicacao": "..."
+  }
+]`;
+
+      const result = await model.generateContent(prompt);
+      const textOutput = result.response.text();
+      const parsed = JSON.parse(textOutput);
+
+      return parsed.map((item: any) => {
+        const question = {
+          prompt: item.prompt,
+          options: item.options || [],
+          correctAnswerIndex: typeof item.correctAnswerIndex === 'number' ? item.correctAnswerIndex : 0,
+          explanation: item.explanation ?? item.explicacao ?? '',
+        };
+
+        const opts = question.options;
+        if (opts.length <= 1) return question;
+
+        const correctText = opts[question.correctAnswerIndex] ?? opts[0];
+        const shuffledOptions = [...opts];
+
+        for (let i = shuffledOptions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+        }
+
+        const newCorrectIndex = shuffledOptions.indexOf(correctText);
+
+        return {
+          ...question,
+          options: shuffledOptions,
+          correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
+        };
+      });
+    }
+
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
+
+REGRAS DE QUALIDADE:
+1. As perguntas devem ser curtas e instigantes.
+2. Evite jargões desnecessários.
+3. Alternativas incorretas devem ser confusões reais da disciplina.
+4. VARIABILIDADE DA RESPOSTA CORRETA (MUITO IMPORTANTE): Distribua a alternativa correta de forma variada e equilibrada entre as posições 0, 1, 2 e 3 (Opções A, B, C e D). NUNCA coloque a resposta certa sempre na opção 0 / Opção A.
+5. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
@@ -309,16 +575,17 @@ Se houver tópicos com peso maior, concentre ~60% neles e mantenha ~40% no resta
 
 PROIBIDO:
 - Mencionar "Anne", a aluna, ou transformar a estudante em personagem do enunciado.
-- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura do arquivo.
-- Interpretação de uma linha isolada de cabeçalho/rodapé.
+- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura técnica de contêiner de arquivo (PDF, páginas, itens, "objeto 14", "stream de dados").
+- Se o material tratar de computação forense ou assinaturas de arquivo, formule a pergunta de forma 100% TEÓRICA e CONCEITUAL sobre a disciplina (ex: "Qual o propósito da assinatura binária FF D8 FF E0 no cabeçalho de um arquivo de imagem?"), NUNCA citando "objeto X" ou "no arquivo enviado".
+- Interpretação de uma linha isolada de cabeçalho/rodapé de arquivo.
 
 ESTRUTURA E FORMATO DE SAÍDA:
 Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
 [
   {
     "prompt": "...",
-    "options": ["opcao 0", "opcao 1", "opcao 2", "opcao 3"],
-    "correctAnswerIndex": 0,
+    "options": ["opcao A", "opcao B", "opcao C", "opcao D"],
+    "correctAnswerIndex": 2,
     "explicacao": "..."
   }
 ]`;
@@ -346,12 +613,34 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
     const parsed = JSON.parse(textOutput);
 
-    return parsed.map((item: any) => ({
-      prompt: item.prompt,
-      options: item.options,
-      correctAnswerIndex: item.correctAnswerIndex,
-      explanation: item.explanation ?? item.explicacao ?? '',
-    }));
+    return parsed.map((item: any) => {
+      const question = {
+        prompt: item.prompt,
+        options: item.options || [],
+        correctAnswerIndex: typeof item.correctAnswerIndex === 'number' ? item.correctAnswerIndex : 0,
+        explanation: item.explanation ?? item.explicacao ?? '',
+      };
+
+      // Aplica embaralhamento aleatório das opções para garantir distribuição equilibrada das respostas A, B, C, D
+      const options = question.options;
+      if (options.length <= 1) return question;
+
+      const correctText = options[question.correctAnswerIndex] ?? options[0];
+      const shuffledOptions = [...options];
+
+      for (let i = shuffledOptions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+      }
+
+      const newCorrectIndex = shuffledOptions.indexOf(correctText);
+
+      return {
+        ...question,
+        options: shuffledOptions,
+        correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
+      };
+    });
   }
 
   public async analyzeScheduleImageOrDocument(fileData: {

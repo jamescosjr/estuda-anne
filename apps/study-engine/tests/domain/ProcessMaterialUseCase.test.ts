@@ -234,4 +234,114 @@ describe('ProcessMaterialUseCase', () => {
     expect(result.status).toBe('READY');
     expect(aiService.extractConceptsAndSummary).not.toHaveBeenCalled();
   });
+
+  it('deve orquestrar criacao e delecao do Gemini Context Cache durante o processamento', async () => {
+    const material = Material.create({
+      id: 'mat-cache-01',
+      studentId: 'usr-anne',
+      title: 'Aula de Fisica Quantica',
+      format: 'PDF',
+      fileUrl: 'https://storage.estuda-anne.com/fisica.pdf',
+      fileSizeBytes: 2048,
+      mimeType: 'application/pdf',
+    });
+    material.setRawContent('O principio da incerteza de Heisenberg estabelece limites para a precisao de medidas simultaneas de posicao e momento.');
+
+    const mockCacheHandle = {
+      cache: { name: 'cachedContents/fisica-cache-123', model: 'models/gemini-1.5-flash-001' },
+      file: { name: 'files/fisica-file-123' },
+    };
+
+    const materialRepo: IMaterialRepository = {
+      save: vi.fn(),
+      findById: vi.fn().mockResolvedValue(material),
+      findByStudentId: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteManyByIds: vi.fn(),
+    };
+
+    const flashcardRepo: IFlashcardRepository = {
+      save: vi.fn(),
+      saveMany: vi.fn().mockResolvedValue(undefined),
+      findById: vi.fn(),
+      findByStudentId: vi.fn(),
+      findDueCards: vi.fn(),
+      findByMaterialId: vi.fn().mockResolvedValue([]),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+
+    const quizRepo: IQuizRepository = {
+      save: vi.fn().mockResolvedValue(undefined),
+      findById: vi.fn(),
+      findByMaterialId: vi.fn().mockResolvedValue([]),
+      findByStudentId: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+
+    const aiService: ILanguageModelService = {
+      createContextCache: vi.fn().mockResolvedValue(mockCacheHandle),
+      deleteContextCache: vi.fn().mockResolvedValue(undefined),
+      extractConceptsAndSummary: vi.fn().mockResolvedValue({
+        summary: 'Resumo sobre principio da incerteza.',
+        keyConcepts: ['incerteza', 'heisenberg'],
+      }),
+      generateFlashcards: vi.fn().mockResolvedValue([
+        { front: 'O que e incerteza?', back: 'Impossibilidade de medir simultaneamente posicao e momento.' },
+      ]),
+      generateQuizQuestions: vi.fn().mockResolvedValue([
+        {
+          prompt: 'O que estabelece o principio de Heisenberg?',
+          options: ['Limites de precisao', 'Gravidade universal', 'Relatividade restrita', 'Entropia max'],
+          correctAnswerIndex: 0,
+          explanation: 'Principio da Incerteza.',
+        },
+      ]),
+    };
+
+    const useCase = new ProcessMaterialUseCase(
+      materialRepo,
+      flashcardRepo,
+      quizRepo,
+      aiService,
+      { transcribe: vi.fn() }
+    );
+
+    const result = await useCase.execute({
+      materialId: 'mat-cache-01',
+      fileBase64: 'JVBERi0xLjQK...',
+      mimeType: 'application/pdf',
+      fileName: 'fisica.pdf',
+    });
+
+    expect(result.status).toBe('READY');
+    expect(aiService.createContextCache).toHaveBeenCalledWith({
+      mimeType: 'application/pdf',
+      dataBase64: 'JVBERi0xLjQK...',
+      textContent: expect.stringContaining('Heisenberg'),
+      fileName: 'fisica.pdf',
+    });
+    expect(aiService.extractConceptsAndSummary).toHaveBeenCalledWith(
+      expect.any(String),
+      { cacheHandle: mockCacheHandle }
+    );
+    expect(aiService.generateFlashcards).toHaveBeenCalledWith(
+      expect.any(String),
+      5,
+      [],
+      expect.any(Array),
+      { cacheHandle: mockCacheHandle }
+    );
+    expect(aiService.generateQuizQuestions).toHaveBeenCalledWith(
+      expect.any(String),
+      4,
+      [],
+      expect.any(Array),
+      { cacheHandle: mockCacheHandle }
+    );
+    expect(aiService.deleteContextCache).toHaveBeenCalledWith(mockCacheHandle);
+  });
 });

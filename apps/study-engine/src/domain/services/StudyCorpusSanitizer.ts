@@ -75,11 +75,15 @@ export function isDocumentMetaReferencing(text: string): boolean {
   
   if (OFF_TOPIC_HINTS.some((hint) => t.includes(hint))) return true;
   
+  // Detecta referências a objetos internos de PDF (ex: "objeto 14", "objeto 3", "stream do objeto 12")
+  if (/\b(objeto|obj)\s+\d+\b/i.test(t)) return true;
+  if (/\b(fluxo de dados|stream)\b.*\b(objeto|pdf|imagem|documento)\b/i.test(t)) return true;
+
   // Detecta padrões como "no item 3", "na página 12", "no capítulo 2 do pdf", "conforme a figura 4 do documento"
-  const docRefRegex = /\b(no|na|do|da|segundo|conforme|de acordo com|conforme o|citado no|mencionado no|conforme a|conforme os)\s+(?:item|página|pagina|pdf|documento|arquivo|anexo|trecho|seção|secao|capítulo|capitulo)\b/i;
+  const docRefRegex = /\b(no|na|do|da|segundo|conforme|de acordo com|conforme o|citado no|mencionado no|conforme a|conforme os)\s+(?:item|página|pagina|pdf|documento|arquivo|anexo|trecho|seção|secao|capítulo|capitulo|objeto|obj)\b/i;
   if (docRefRegex.test(t)) return true;
 
-  // Detecta explicitamente "pdf", "documento", "arquivo" quando usados no contexto de formato do arquivo
+  // Detecta explicitamente "pdf", "documento", "arquivo" quando usados no contexto de estrutura técnica do arquivo
   const explicitFormatRegex = /\b(pdf|metadado|metadados|creationdate|moddate)\b/i;
   if (explicitFormatRegex.test(t)) return true;
 

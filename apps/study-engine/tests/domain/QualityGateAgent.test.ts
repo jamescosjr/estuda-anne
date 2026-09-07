@@ -203,4 +203,44 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/duplicados ou repetidos/i);
   });
+
+  it('deve reprovar questões de quiz que citam objetos internos de PDF como "objeto 14" ou "fluxo de dados no objeto"', () => {
+    const flashcards = [
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-1',
+        front: 'O que indica a assinatura binária FF D8 FF E0 em computação forense?',
+        back: 'Identifica o início do cabeçalho de uma imagem em formato JPEG.',
+      }),
+    ];
+
+    const quiz = Quiz.create({
+      studentId: 'usr-1',
+      materialId: 'mat-1',
+      title: 'Quiz de Forense Computacional',
+      questions: [
+        {
+          prompt: 'Logo após a declaração do fluxo de dados da imagem no objeto 14, encontra-se a sequência JFIF. Qual a função dessa assinatura?',
+          options: [
+            'Identificar o formato de imagem JPEG.',
+            'Criptografar o arquivo PDF.',
+            'Definir a tabela de fontes do documento.',
+            'Compactar o texto em zlib.',
+          ],
+          correctAnswerIndex: 0,
+          explanation: 'Assinatura mágica de imagem',
+        },
+      ],
+    });
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo de Forense',
+      ['forense'],
+      flashcards,
+      quiz
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/fora do conteúdo/i);
+  });
 });

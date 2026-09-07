@@ -60,7 +60,8 @@ export class ProcessMaterialUseCase {
       evaluatorAgent,
       flashcardAgent,
       quizAgent,
-      qualityGateAgent
+      qualityGateAgent,
+      this.aiService
     );
   }
 
@@ -123,8 +124,12 @@ export class ProcessMaterialUseCase {
       material.setRawContent(rawText);
       await this.materialRepository.update(material);
 
-      // Execução orquestrada pelo PedagogicalCoordinatorAgent
-      const result = await this.coordinatorAgent.orchestrateProcessing(material, rawText);
+      // Execução orquestrada pelo PedagogicalCoordinatorAgent com suporte a Gemini Context Caching
+      const result = await this.coordinatorAgent.orchestrateProcessing(material, rawText, {
+        fileBase64: input.fileBase64,
+        mimeType: input.mimeType || material.mimeType,
+        fileName: input.fileName || material.title,
+      });
 
       await this.materialRepository.update(material);
 

@@ -362,6 +362,30 @@ function pickUnseenQuestions(pool: QuizQuestion[], count: number): QuizQuestion[
   return selected
 }
 
+function randomizeQuestionOptions(q: QuizQuestion): QuizQuestion {
+  if (!q.options || q.options.length <= 1) return q;
+
+  const correctOptionText = q.options.find((o) => o.id === q.correctId)?.text;
+  if (!correctOptionText) return q;
+
+  const shuffledTextList = [...q.options.map((o) => o.text)];
+  shuffleInPlace(shuffledTextList);
+
+  const optionIds = ['a', 'b', 'c', 'd', 'e'];
+  const newOptions = shuffledTextList.map((text, idx) => ({
+    id: optionIds[idx] || String(idx),
+    text,
+  }));
+
+  const newCorrectOption = newOptions.find((o) => o.text === correctOptionText);
+
+  return {
+    ...q,
+    options: newOptions,
+    correctId: newCorrectOption ? newCorrectOption.id : 'a',
+  };
+}
+
 const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 
 export function QuizSession() {
@@ -399,7 +423,8 @@ export function QuizSession() {
               correctId: String(question.correctAnswerIndex ?? 0),
               explanation: question.explanation || '',
             })),
-          )
+          ).map(randomizeQuestionOptions)
+
           if (mapped.length > 0) {
             const shuffled = pickUnseenQuestions(mapped, targetCount)
             setUsingDemo(false)
@@ -417,7 +442,8 @@ export function QuizSession() {
       }
       setUsingDemo(true)
       setQuestionPool([])
-      setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
+      const rawAcademic = generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter)
+      setQuestions(rawAcademic.map(randomizeQuestionOptions))
       setCurrent(0)
     }
     loadQuizzes()
@@ -427,11 +453,13 @@ export function QuizSession() {
     setCurrent(0)
     if (questionPool.length > 0) {
       setUsingDemo(false)
-      setQuestions(pickUnseenQuestions(questionPool, targetCount))
+      const picked = pickUnseenQuestions(questionPool, targetCount)
+      setQuestions(picked.map(randomizeQuestionOptions))
       return
     }
     setUsingDemo(true)
-    setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
+    const rawAcademic = generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter)
+    setQuestions(rawAcademic.map(randomizeQuestionOptions))
   }
 
   const total = questions.length

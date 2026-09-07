@@ -191,16 +191,30 @@ export function ReviewSession() {
     loadDueCards()
   }, [bffUrl, studentId, userSubjectsKey, targetCount, subjectFilter])
 
+  const [sessionId, setSessionId] = useState<number>(0)
+
   function handleStartExtraSession() {
     setCurrent(0)
     setDone(false)
+    setLoadError(null)
+    setSessionId((s) => s + 1)
+
     if (persistedPool.length > 0) {
       setUsingDemo(false)
-      setCards(shuffleInPlace(persistedPool).slice(0, Math.min(targetCount, persistedPool.length)))
+      const filtered = subjectFilter === 'all'
+        ? persistedPool
+        : persistedPool.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
+      const poolToUse = filtered.length > 0 ? filtered : persistedPool
+      const cloned = [...poolToUse]
+      const shuffled = shuffleInPlace(cloned)
+      setCards(shuffled.slice(0, Math.min(targetCount, shuffled.length)))
       return
     }
+
     setUsingDemo(true)
-    setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
+    const extraCards = generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter)
+    const clonedExtra = [...extraCards]
+    setCards(shuffleInPlace(clonedExtra))
   }
 
   async function handleGrade(difficulty: Difficulty) {

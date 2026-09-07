@@ -1,6 +1,6 @@
 import { Flashcard } from '../../entities/Flashcard.js';
 import { IFlashcardRepository } from '../../ports/IFlashcardRepository.js';
-import { ILanguageModelService } from '../../ports/ILanguageModelService.js';
+import { ILanguageModelService, ContextCacheHandle } from '../../ports/ILanguageModelService.js';
 import {
   isDocumentMetaReferencing,
   isDuplicateOrHighlySimilar,
@@ -18,7 +18,8 @@ export class FlashcardSpecialistAgent {
     rawText: string,
     keyConcepts: readonly string[],
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
-    persist = true
+    persist = true,
+    cacheHandle?: ContextCacheHandle | null
   ): Promise<Flashcard[]> {
     const existingCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
     const existingFronts = existingCards.map(c => c.front);
@@ -27,7 +28,8 @@ export class FlashcardSpecialistAgent {
       rawText,
       5,
       existingFronts,
-      focusTopics
+      focusTopics,
+      { cacheHandle }
     );
 
     const accumulatedFronts: string[] = [...existingFronts];
