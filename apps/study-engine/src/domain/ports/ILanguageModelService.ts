@@ -38,12 +38,12 @@ export interface ParsedScheduleAnalysisResult {
 
 export interface ContextCacheHandle {
   cache: {
-    name: string;
-    model: string;
+    name?: string;
+    model?: string;
     [key: string]: any;
   };
   file?: {
-    name: string;
+    name?: string;
     uri?: string;
     mimeType?: string;
     [key: string]: any;
