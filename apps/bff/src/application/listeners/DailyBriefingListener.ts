@@ -26,10 +26,10 @@ export class DailyBriefingListener {
     console.log(`[DailyBriefingListener] Processando login assíncrono para a usuária: ${studentName} (${userId})`);
 
     // Busca assíncrona simulada/consultada das revisões pendentes e eventos
-    const dueFlashcardsCount = 15; // Exemplo de métrica consultada no resumo do dia
+    const dueFlashcardsCount = subjects.length > 0 ? 5 : 0;
     const todayEvents = subjects.length > 0
-      ? [`Revisão de ${subjects[0]}`, `Quiz de fixação - ${subjects[1] || subjects[0]}`]
-      : ['Revisão espaçada de Cálculo I', 'Quiz de fixação em Algoritmos'];
+      ? subjects.map((s) => `Revisão de ${s}`)
+      : [];
 
     const context: DailyBriefingContext = {
       studentId: userId,

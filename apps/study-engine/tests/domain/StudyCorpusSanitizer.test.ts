@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   isPedagogicallyOffTopic,
   sanitizeStudyCorpus,
+  isDocumentMetaReferencing,
+  isDuplicateOrHighlySimilar,
 } from '../../src/domain/services/StudyCorpusSanitizer.js';
 
 describe('StudyCorpusSanitizer', () => {
@@ -41,6 +43,31 @@ describe('StudyCorpusSanitizer', () => {
     ).toBe(true);
     expect(
       isPedagogicallyOffTopic('O que caracteriza o fine-tuning supervisionado de um LLM?')
+    ).toBe(false);
+  });
+
+  it('detecta citações e referências estruturais de PDF e documento', () => {
+    expect(isDocumentMetaReferencing('Segundo o item 3 do PDF, qual é a definição?')).toBe(true);
+    expect(isDocumentMetaReferencing('Na página 12 do documento, o que é explicado?')).toBe(true);
+    expect(isDocumentMetaReferencing('Conforme o texto enviado, como funciona o processo?')).toBe(true);
+    expect(isDocumentMetaReferencing('Qual a função do ribossomo na síntese proteica?')).toBe(false);
+  });
+
+  it('detecta similaridade semântica para impedir flashcards duplicados', () => {
+    const existing = ['Qual a função da mitocôndria na célula eucariótica?'];
+    expect(
+      isDuplicateOrHighlySimilar(
+        'Qual é a função da mitocôndria na célula eucariótica?',
+        existing,
+        0.60
+      )
+    ).toBe(true);
+    expect(
+      isDuplicateOrHighlySimilar(
+        'O que é a fotossíntese e onde ela ocorre nas plantas?',
+        existing,
+        0.60
+      )
     ).toBe(false);
   });
 });

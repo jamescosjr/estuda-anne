@@ -1,6 +1,10 @@
 import { Flashcard } from '../../entities/Flashcard.js';
 import { Quiz } from '../../entities/Quiz.js';
-import { isPedagogicallyOffTopic } from '../StudyCorpusSanitizer.js';
+import {
+  isPedagogicallyOffTopic,
+  isDocumentMetaReferencing,
+  isDuplicateOrHighlySimilar,
+} from '../StudyCorpusSanitizer.js';
 
 export interface QualityCheckResult {
   passed: boolean;
@@ -27,32 +31,51 @@ export class QualityGateAgent {
       return { passed: false, score: 50, reason: 'Flashcards pedagógicos não gerados' };
     }
 
-    // Validação de duplicidade e qualidade em Flashcards
-    const flashcardFronts = new Set<string>();
+    // Validação de duplicidade, referências a PDF/documento e qualidade em Flashcards
+    const flashcardFronts: string[] = [];
     for (const fc of flashcards) {
-      const normalizedFront = fc.front.trim().toLowerCase();
-      if (flashcardFronts.has(normalizedFront)) {
-        return { passed: false, score: 60, reason: 'Flashcards duplicados detectados no lote' };
+      if (isDocumentMetaReferencing(fc.front) || isDocumentMetaReferencing(fc.back)) {
+        return {
+          passed: false,
+          score: 60,
+          reason: `Flashcard contém referências a formato de documento ou PDF: "${fc.front.slice(0, 45)}"`,
+        };
       }
-      flashcardFronts.add(normalizedFront);
+
+      if (fc.front.trim().length < 12 || fc.back.trim().length < 15) {
+        return {
+          passed: false,
+          score: 55,
+          reason: 'Flashcard com pergunta ou resposta rasa/incompleta',
+        };
+      }
+
+      if (isDuplicateOrHighlySimilar(fc.front, flashcardFronts, 0.60)) {
+        return {
+          passed: false,
+          score: 60,
+          reason: `Flashcards duplicados ou repetidos detectados no lote: "${fc.front.slice(0, 45)}"`,
+        };
+      }
+      flashcardFronts.push(fc.front.trim());
     }
 
     // Validação de duplicidade e qualidade no Quiz
     if (quiz && quiz.questions.length > 0) {
-      const questionPrompts = new Set<string>();
+      const questionPrompts: string[] = [];
       for (const q of quiz.questions) {
-        const normalizedPrompt = q.prompt.trim().toLowerCase();
-        if (questionPrompts.has(normalizedPrompt)) {
-          return { passed: false, score: 70, reason: 'Perguntas duplicadas detectadas no quiz' };
-        }
-        if (isPedagogicallyOffTopic(q.prompt)) {
+        if (isPedagogicallyOffTopic(q.prompt) || isDocumentMetaReferencing(q.prompt)) {
           return {
             passed: false,
             score: 65,
-            reason: 'Pergunta fora do conteúdo da matéria (metadados, data de arquivo ou personagem Anne)',
+            reason: 'Pergunta fora do conteúdo da matéria (metadados, data de arquivo, PDF ou aluna Anne)',
           };
         }
-        questionPrompts.add(normalizedPrompt);
+
+        if (isDuplicateOrHighlySimilar(q.prompt, questionPrompts, 0.60)) {
+          return { passed: false, score: 70, reason: 'Perguntas duplicadas ou muito semelhantes no quiz' };
+        }
+        questionPrompts.push(q.prompt.trim());
 
         // Verifica duplicidade nas opções da mesma questão
         const normalizedOptions = new Set(q.options.map(o => o.trim().toLowerCase()));

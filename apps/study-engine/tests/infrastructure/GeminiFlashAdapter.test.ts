@@ -97,9 +97,9 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
 
       const promptText = capturedRequestBody.contents[0].parts[0].text;
       expect(promptText).toContain('Você é um coordenador pedagógico especialista em microlearning');
-      expect(promptText).toContain('UM conceito');
+      expect(promptText).toContain('DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO');
       expect(promptText).toContain('MATERIAL BASE:');
-      expect(promptText).toContain('NÃO mencione a aluna Anne');
+      expect(promptText).toContain('NUNCA mencione a estudante Anne');
 
       expect(cards.length).toBe(1);
       expect(cards[0].front).toBe('Qual a pré-condição dos pesos no algoritmo de Dijkstra?');

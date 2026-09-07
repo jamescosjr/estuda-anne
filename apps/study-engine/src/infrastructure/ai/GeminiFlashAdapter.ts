@@ -203,22 +203,20 @@ ${content.slice(0, 10000)}`;
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um coordenador pedagógico especialista em microlearning. Gere flashcards para estudar o CONTEÚDO da matéria, não o documento.
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
+Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO da matéria, nunca sobre o documento.
 
-REGRAS DE QUALIDADE:
-1. Os flashcards devem ter perguntas curtas e instigantes.
-2. A resposta deve ser direta e em tópicos se necessário.
-3. Evite jargões desnecessários.
-4. Cada card foca UM conceito da disciplina (definição, mecanismo, comparação ou uso).
-5. Frente = gatilho de memória. Verso = no máximo 2 frases ou tópicos curtos.
-6. NÃO mencione a aluna Anne. NÃO pergunte autor, data, metadados, formato de arquivo ou nome do PDF.
-7. Priorize conceitos-chave (maior peso), mas cubra o restante do material.
+REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
+1. DIVERSIDADE ABSOLUTA E ANTI-REPETIÇÃO: Cada um dos ${count} flashcards DEVE focar em um ângulo DIFERENTE e ÚNICO do conteúdo (ex: 1. Definição do princípio; 2. Mecanismo de ação; 3. Relação de Causa e Efeito; 4. Aplicação acadêmica/prática; 5. Comparação ou Limitação). NUNCA gere flashcards parecidos ou redundantes.
+2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas. A pergunta deve contextualizar o conceito sem depender de texto externo. O verso deve ser completo, claro e pedagogicamente rico (2 a 3 frases explicativas ou tópicos diretos).
+3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado", "conforme o texto", "de acordo com o texto" ou "autor". O flashcard deve tratar puramente da ciência/conceito da matéria.
+4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
 ${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${count} flashcards inéditos com base estritamente nos conceitos da matéria.
+Gere ${count} flashcards profissionais, distintos e auto-contidos sobre a disciplina.
 
 ESTRUTURA E FORMATO DE SAÍDA:
 Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.

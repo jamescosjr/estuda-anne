@@ -456,25 +456,77 @@ export async function studyRoutes(app: FastifyInstance) {
     reply.raw.setHeader('Connection', 'keep-alive');
     reply.raw.setHeader('Access-Control-Allow-Origin', '*');
 
+    let dueCount = 0;
+    let events: string[] = [];
+    let studentSubjects: string[] = [];
+
+    // 1. Busca dinamicamente os materiais do aluno para obter as matérias reais
+    try {
+      const matRes = await fetch(`${STUDY_ENGINE_URL}/materials?studentId=${encodeURIComponent(studentId)}`);
+      if (matRes.ok) {
+        const materials = (await matRes.json()) as any[];
+        if (Array.isArray(materials) && materials.length > 0) {
+          studentSubjects = Array.from(
+            new Set(materials.map((m: any) => m.subject || m.tags?.[0]).filter(Boolean))
+          );
+        }
+      }
+    } catch {
+      // Ignora erro de rede ao buscar materiais
+    }
+
+    // 2. Busca dinamicamente a contagem de flashcards pendentes do aluno
+    try {
+      const dueRes = await fetch(`${STUDY_ENGINE_URL}/flashcards/due?studentId=${encodeURIComponent(studentId)}`);
+      if (dueRes.ok) {
+        const dueCards = (await dueRes.json()) as any[];
+        if (Array.isArray(dueCards)) {
+          dueCount = dueCards.length;
+        }
+      }
+    } catch {
+      // Ignora erro de rede ao buscar flashcards
+    }
+
     const context = DailyBriefingListener.getContext(studentId);
-    const studentName = name || context?.studentName || 'Anne';
-    const dueCount = context?.dueFlashcardsCount ?? 15;
-    const events = context?.todayEvents ?? ['Revisão espaçada de Cálculo I', 'Quiz de Algoritmos'];
+    const studentName = name || context?.studentName || 'Estudante';
+
+    if (studentSubjects.length > 0) {
+      events = studentSubjects.map((s) => `Revisão de ${s}`);
+    } else if (context?.todayEvents && context.todayEvents.length > 0) {
+      events = context.todayEvents.filter((e) => !e.includes('Cálculo') && !e.includes('Algoritmos'));
+    }
 
     const apiKey = process.env.GEMINI_API_KEY;
     let briefingText = '';
 
     if (apiKey) {
       try {
-        const prompt = `Você é um mentor universitário especialista e empático para a estudante ${studentName}.
-Gere um briefing matinal curto (máximo 3 frases) de boas-vindas para o dashboard.
+        const prompt =
+          events.length > 0 || dueCount > 0
+            ? `Você é um mentor universitário especialista e empático para a pessoa estudante ${studentName}.
+Gere um briefing matinal curto (máximo 2 a 3 frases) de boas-vindas para o dashboard de estudos.
 
-DADOS:
+DADOS REAIS DA ESTUDANTE:
 - Nome: ${studentName}
-- Flashcards para revisar hoje: ${dueCount}
-- Atividades do dia: ${events.join(', ')}
+- Flashcards pendentes hoje: ${dueCount}
+- Matérias/Atividades cadastradas: ${events.join(', ')}
 
-Exemplo: "Oi Anne, bom dia! Vi que temos 15 flashcards de Cálculo pendentes para hoje. Que tal iniciar sua revisão em blocos de 15 minutos para maximizar a retenção?"`;
+REGRAS RÍGIDAS:
+- Mencione APENAS as matérias listadas acima (${events.join(', ')}).
+- NUNCA mencione Cálculo I, Algoritmos ou matérias que não estejam na lista acima.
+- Destaque o estudo ativo e a retenção em blocos curtos.`
+            : `Você é um mentor universitário especialista e empático para a pessoa estudante ${studentName}.
+Gere um briefing matinal curto (máximo 2 a 3 frases) de boas-vindas para o dashboard de estudos.
+
+DADOS REAIS DA ESTUDANTE:
+- Nome: ${studentName}
+- O(a) estudante ainda não cadastrou materiais nem possui flashcards pendentes hoje.
+
+REGRAS RÍGIDAS:
+- Dê boas-vindas calorosas e encorajadoras.
+- Convide o(a) estudante a fazer o upload do seu primeiro material de estudo (PDF, anotação ou resumo) para gerar flashcards e conteúdos inteligentes.
+- NUNCA mencione matérias fictícias (como Cálculo I, Algoritmos, etc.).`;
 
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
@@ -498,7 +550,12 @@ Exemplo: "Oi Anne, bom dia! Vi que temos 15 flashcards de Cálculo pendentes par
     }
 
     if (!briefingText) {
-      briefingText = `Oi ${studentName}, bom dia! Vi que temos ${dueCount} flashcards pendentes e revisões de ${events.slice(0, 2).join(' e ')} programadas para hoje. Sugiro iniciar com um bloco de 15 minutos de estudo ativo!`;
+      if (events.length > 0 || dueCount > 0) {
+        const activityDesc = events.length > 0 ? events.slice(0, 2).join(' e ') : 'suas revisões espaçadas';
+        briefingText = `Oi ${studentName}, bom dia! Você tem ${dueCount} flashcard(s) pendente(s) e ${activityDesc} para hoje. Bom estudo!`;
+      } else {
+        briefingText = `Oi ${studentName}, bom dia! Seu ambiente de estudos está pronto. Adicione seu primeiro material para gerar resumos e flashcards automáticos!`;
+      }
     }
 
     const words = briefingText.split(' ');

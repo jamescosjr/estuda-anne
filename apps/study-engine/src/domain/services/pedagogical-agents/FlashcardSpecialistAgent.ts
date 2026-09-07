@@ -1,6 +1,10 @@
 import { Flashcard } from '../../entities/Flashcard.js';
 import { IFlashcardRepository } from '../../ports/IFlashcardRepository.js';
 import { ILanguageModelService } from '../../ports/ILanguageModelService.js';
+import {
+  isDocumentMetaReferencing,
+  isDuplicateOrHighlySimilar,
+} from '../StudyCorpusSanitizer.js';
 
 export class FlashcardSpecialistAgent {
   constructor(
@@ -26,15 +30,23 @@ export class FlashcardSpecialistAgent {
       focusTopics
     );
 
-    const seenFronts = new Set(existingFronts.map(f => f.trim().toLowerCase()));
-    const uniqueCards = generatedCards.filter((c) => {
-      const norm = c.front.trim().toLowerCase();
-      if (seenFronts.has(norm)) return false;
-      seenFronts.add(norm);
+    const accumulatedFronts: string[] = [...existingFronts];
+    const cleanUniqueCards = generatedCards.filter((c) => {
+      // 1. Rejeita cartões com referências a metadados, PDF, arquivos ou itens do documento
+      if (isDocumentMetaReferencing(c.front) || isDocumentMetaReferencing(c.back)) {
+        return false;
+      }
+
+      // 2. Rejeita cartões duplicados ou semanticamente repetidos (> 60% Jaccard similarity)
+      if (isDuplicateOrHighlySimilar(c.front, accumulatedFronts, 0.60)) {
+        return false;
+      }
+
+      accumulatedFronts.push(c.front.trim());
       return true;
     });
 
-    const flashcards = uniqueCards.map((c) =>
+    const flashcards = cleanUniqueCards.map((c) =>
       Flashcard.create({
         studentId,
         materialId,

@@ -45,8 +45,8 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
 
   it('deve reprovar quando houver flashcards duplicados', () => {
     const flashcards = [
-      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é derivada?', back: 'Taxa de variação' }),
-      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é derivada?', back: 'Outra resposta' }),
+      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é derivada?', back: 'A taxa de variação instantânea de uma função matemática.' }),
+      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é derivada?', back: 'Outra resposta sobre taxa de variação.' }),
     ];
 
     const result = qualityGate.evaluateQuality(
@@ -128,7 +128,7 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
 
   it('deve reprovar perguntas sobre metadados, datas de arquivo ou a aluna Anne', () => {
     const flashcards = [
-      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é um LLM?', back: 'Modelo de linguagem' }),
+      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é um LLM em inteligência artificial?', back: 'Modelo de linguagem de grande escala treinado com dados de texto' }),
     ];
 
     const quiz = Quiz.create({
@@ -154,5 +154,53 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
 
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/fora do conteúdo/i);
+  });
+
+  it('deve reprovar flashcards que mencionam estrutura do PDF, páginas ou itens de documento', () => {
+    const flashcards = [
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-1',
+        front: 'Segundo o item 3 do PDF, qual a definição de ATP?',
+        back: 'Molécula responsável pelo armazenamento de energia celular',
+      }),
+    ];
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo de Bioquímica',
+      ['atp'],
+      flashcards,
+      null
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/referências a formato de documento ou PDF/i);
+  });
+
+  it('deve reprovar flashcards com alta similaridade semântica entre si', () => {
+    const flashcards = [
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-1',
+        front: 'Qual a função principal da mitocôndria na célula eucariótica?',
+        back: 'Produção de ATP através da respiração celular',
+      }),
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-1',
+        front: 'Qual é a função da mitocôndria dentro da célula eucariótica?',
+        back: 'Gerar energia para a célula na forma de ATP',
+      }),
+    ];
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo de Biologia Celular',
+      ['mitocôndria'],
+      flashcards,
+      null
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/duplicados ou repetidos/i);
   });
 });
