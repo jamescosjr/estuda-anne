@@ -1,3 +1,8 @@
+import { writeFileSync, unlinkSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleAIFileManager } from '@google/generative-ai/server';
 import {
   ILanguageModelService,
   MaterialAnalysisResult,
@@ -23,7 +28,7 @@ function sleep(ms: number): Promise<void> {
 
 async function geminiFetch(url: string, init: RequestInit, operation = 'gemini_generate'): Promise<Response> {
   let lastError: unknown;
-  const timeoutMs = 25000;
+  const timeoutMs = 120000;
   const body = init.body;
   const headers = init.headers;
 
@@ -446,39 +451,85 @@ Formato JSON estrito esperado:
       return 'Conteúdo acadêmico extraído do documento via visão multimodal para geração de resumos e flashcards de estudo.';
     }
 
-    const prompt = `Você é um coordenador pedagógico especialista em microlearning.
+    const mimeType = fileData.mimeType || 'application/pdf';
+    const extension = mimeType.includes('pdf')
+      ? '.pdf'
+      : mimeType.includes('png')
+      ? '.png'
+      : mimeType.includes('jpg') || mimeType.includes('jpeg')
+      ? '.jpg'
+      : '.bin';
+
+    const tempFilePath = join(
+      tmpdir(),
+      `upload_${Date.now()}_${Math.random().toString(36).substring(7)}${extension}`
+    );
+
+    let uploadedFile: { name: string; uri: string; mimeType: string } | null = null;
+    const fileManager = new GoogleAIFileManager(this.apiKey);
+
+    try {
+      // 1. Salva o arquivo temporário localmente
+      const buffer = Buffer.from(fileData.dataBase64, 'base64');
+      writeFileSync(tempFilePath, buffer);
+
+      // 2. Upload usando GoogleAIFileManager (File API)
+      const uploadResult = await fileManager.uploadFile(tempFilePath, {
+        mimeType,
+        displayName: 'Estuda Anne Multimodal Document',
+      });
+      uploadedFile = uploadResult.file;
+
+      // 3. Inicializa SDK oficial GoogleGenerativeAI com gemini-1.5-flash
+      const genAI = new GoogleGenerativeAI(this.apiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning.
 Extraia e transcreva todo o texto e conteúdo acadêmico relevante presente neste documento/imagem/PDF.
 Retorne APENAS o texto extraído do material na íntegra, sem formatação markdown extra nem saudações.`;
 
-    const parts: any[] = [
-      {
-        inlineData: {
-          mimeType: fileData.mimeType || 'application/pdf',
-          data: fileData.dataBase64,
-        },
-      },
-      { text: prompt },
-    ];
+      // 4. Configura timeout de 120.000 ms (120 segundos)
+      const controller = new AbortController();
+      const timeoutTimer = setTimeout(() => controller.abort(), 120000);
 
-    const response = await geminiFetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: { temperature: 0.2 },
-        }),
+      try {
+        const result = await model.generateContent(
+          [
+            {
+              fileData: {
+                mimeType: uploadedFile.mimeType,
+                fileUri: uploadedFile.uri,
+              },
+            },
+            { text: prompt },
+          ],
+          { requestOptions: { timeout: 120000, signal: controller.signal } } as any
+        );
+
+        const responseText = result.response.text();
+        return responseText ? responseText.trim() : '';
+      } finally {
+        clearTimeout(timeoutTimer);
       }
-    );
+    } finally {
+      // 5. Limpeza do arquivo temporário no disco local
+      if (existsSync(tempFilePath)) {
+        try {
+          unlinkSync(tempFilePath);
+        } catch {
+          // Ignora erros ao apagar arquivo temporário local
+        }
+      }
 
-    if (!response.ok) {
-      throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+      // 6. Limpeza do arquivo na File API do Google (evita acúmulo de armazenamento)
+      if (uploadedFile?.name) {
+        try {
+          await fileManager.deleteFile(uploadedFile.name);
+        } catch {
+          // Ignora erros ao apagar arquivo remoto da File API
+        }
+      }
     }
-
-    const data = (await response.json()) as any;
-    const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return textOutput.trim();
   }
 
   public async generateDailyBriefingStream(

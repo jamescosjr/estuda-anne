@@ -15,6 +15,7 @@
     "@aws-sdk/client-s3": "^3.1126.0",
     "@estuda-anne/shared": "workspace:*",
     "@fastify/cors": "^10.0.2",
+    "@google/generative-ai": "^0.24.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "mongodb": "^6.13.0",
