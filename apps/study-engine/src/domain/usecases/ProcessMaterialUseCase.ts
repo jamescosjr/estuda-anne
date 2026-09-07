@@ -86,14 +86,23 @@ export class ProcessMaterialUseCase {
 
       let rawText = input.textContent?.trim() || material.rawContent;
 
-      if ((!rawText || rawText.trim().length === 0) && this.contentExtractor && input.fileBase64) {
-        material.startExtraction();
-        await this.materialRepository.update(material);
-        rawText = await this.contentExtractor.extractText({
-          fileBase64: input.fileBase64,
-          mimeType: input.mimeType || material.mimeType,
-          fileName: input.fileName || material.title,
-        });
+      if ((!rawText || rawText.trim().length === 0) && input.fileBase64) {
+        if (this.contentExtractor) {
+          material.startExtraction();
+          await this.materialRepository.update(material);
+          rawText = await this.contentExtractor.extractText({
+            fileBase64: input.fileBase64,
+            mimeType: input.mimeType || material.mimeType,
+            fileName: input.fileName || material.title,
+          });
+        }
+
+        if ((!rawText || rawText.trim().length === 0) && this.aiService.extractTextFromMultimodalDocument) {
+          rawText = await this.aiService.extractTextFromMultimodalDocument({
+            mimeType: input.mimeType || material.mimeType,
+            dataBase64: input.fileBase64,
+          });
+        }
       }
 
       if (material.isAudioOrVideo() && !rawText) {

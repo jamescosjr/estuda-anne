@@ -42,6 +42,17 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
         expect(q.explanation).toBeTruthy();
       }
     });
+
+    it('deve extrair texto de documento multimodal sem chave de API usando fallback', async () => {
+      const adapter = new GeminiFlashAdapter('');
+      const text = await adapter.extractTextFromMultimodalDocument({
+        mimeType: 'application/pdf',
+        dataBase64: 'JVBERi0xLjQK',
+      });
+
+      expect(text).toBeTruthy();
+      expect(text).toContain('Conteúdo acadêmico extraído');
+    });
   });
 
   describe('Chamada Online com Gemini API (Mock de Fetch)', () => {

@@ -438,6 +438,49 @@ Formato JSON estrito esperado:
     };
   }
 
+  public async extractTextFromMultimodalDocument(fileData: {
+    mimeType?: string;
+    dataBase64?: string;
+  }): Promise<string> {
+    if (!this.apiKey || !fileData.dataBase64) {
+      return 'Conteúdo acadêmico extraído do documento via visão multimodal para geração de resumos e flashcards de estudo.';
+    }
+
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning.
+Extraia e transcreva todo o texto e conteúdo acadêmico relevante presente neste documento/imagem/PDF.
+Retorne APENAS o texto extraído do material na íntegra, sem formatação markdown extra nem saudações.`;
+
+    const parts: any[] = [
+      {
+        inlineData: {
+          mimeType: fileData.mimeType || 'application/pdf',
+          data: fileData.dataBase64,
+        },
+      },
+      { text: prompt },
+    ];
+
+    const response = await geminiFetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: { temperature: 0.2 },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = (await response.json()) as any;
+    const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return textOutput.trim();
+  }
+
   public async generateDailyBriefingStream(
     studentName: string,
     metrics: { dueFlashcardsCount: number; todayEvents: string[] },

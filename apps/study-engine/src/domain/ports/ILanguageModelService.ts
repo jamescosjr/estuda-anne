@@ -51,6 +51,7 @@ export interface ILanguageModelService {
     focusTopics?: Array<{ topic: string; priorityWeight: number }>
   ): Promise<GeneratedQuizQuestionDTO[]>;
   analyzeScheduleImageOrDocument(fileData: { mimeType?: string; dataBase64?: string; textContent?: string }): Promise<ParsedScheduleAnalysisResult>;
+  extractTextFromMultimodalDocument(fileData: { mimeType?: string; dataBase64?: string }): Promise<string>;
   generateDailyBriefingStream(
     studentName: string,
     metrics: { dueFlashcardsCount: number; todayEvents: string[] },
