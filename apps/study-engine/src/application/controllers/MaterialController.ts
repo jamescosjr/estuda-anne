@@ -20,6 +20,7 @@ export class MaterialController {
     const material = Material.create({
       studentId: validatedBody.studentId,
       title: validatedBody.title,
+      subject: validatedBody.subject,
       format: validatedBody.format,
       fileUrl: validatedBody.fileUrl,
       fileSizeBytes: validatedBody.fileSizeBytes,

@@ -33,6 +33,7 @@ export interface ScheduleEvent {
 export interface UploadItem {
   id: string
   name: string
+  subject?: string
   kind: 'PDF' | 'PPTX' | 'MP4' | 'MP3'
   size: string
   status: UploadStatus

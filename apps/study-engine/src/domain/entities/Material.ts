@@ -4,6 +4,7 @@ export interface MaterialProps {
   id: string;
   studentId: string;
   title: string;
+  subject?: string;
   format: MaterialFormat;
   fileUrl: string;
   fileSizeBytes: number;
@@ -23,6 +24,7 @@ export type CreateMaterialProps = Omit<
   'id' | 'status' | 'keyConcepts' | 'createdAt' | 'updatedAt' | 'summary' | 'rawContent' | 'errorMessage' | 'processedAt'
 > & {
   id?: string;
+  subject?: string;
   rawContent?: string;
 };
 
@@ -48,6 +50,7 @@ export class Material {
     return new Material({
       ...props,
       id: props.id || crypto.randomUUID(),
+      subject: props.subject?.trim() || undefined,
       status: 'PENDING',
       keyConcepts: [],
       rawContent: props.rawContent,
@@ -64,6 +67,7 @@ export class Material {
   public get id(): string { return this.props.id; }
   public get studentId(): string { return this.props.studentId; }
   public get title(): string { return this.props.title; }
+  public get subject(): string | undefined { return this.props.subject; }
   public get format(): MaterialFormat { return this.props.format; }
   public get fileUrl(): string { return this.props.fileUrl; }
   public get fileSizeBytes(): number { return this.props.fileSizeBytes; }

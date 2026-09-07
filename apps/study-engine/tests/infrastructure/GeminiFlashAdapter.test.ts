@@ -85,7 +85,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(capturedRequestBody.generationConfig.responseMimeType).toBe('application/json');
 
       const promptText = capturedRequestBody.contents[0].parts[0].text;
-      expect(promptText).toContain('Você é um tutor universitário');
+      expect(promptText).toContain('Você é um coordenador pedagógico especialista em microlearning');
       expect(promptText).toContain('UM conceito');
       expect(promptText).toContain('MATERIAL BASE:');
       expect(promptText).toContain('NÃO mencione a aluna Anne');

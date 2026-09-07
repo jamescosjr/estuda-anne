@@ -106,11 +106,19 @@ export class GeminiFlashAdapter implements ILanguageModelService {
     }
 
     // Chamada HTTP otimizada para o Gemini Flash via API REST (baixo overhead, sem sdk pesado)
-    const prompt = `Analise o seguinte material de estudo universitário.
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning.
+Analise o seguinte material de estudo universitário.
 Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
-1. Um resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
-2. Até 5 conceitos-chave essenciais, priorizando os que mais caem em prova.
-Formato JSON esperado:
+
+REGRAS DE QUALIDADE:
+- Resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
+- Até 5 conceitos-chave essenciais, priorizando os que mais caem em prova.
+- Evite jargões desnecessários.
+
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
+
+Formato esperado:
 {"summary": "...", "keyConcepts": ["..."]}
 
 Material:
@@ -190,7 +198,16 @@ ${content.slice(0, 10000)}`;
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um tutor universitário. Gere flashcards para estudar o CONTEÚDO da matéria, não o documento.
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning. Gere flashcards para estudar o CONTEÚDO da matéria, não o documento.
+
+REGRAS DE QUALIDADE:
+1. Os flashcards devem ter perguntas curtas e instigantes.
+2. A resposta deve ser direta e em tópicos se necessário.
+3. Evite jargões desnecessários.
+4. Cada card foca UM conceito da disciplina (definição, mecanismo, comparação ou uso).
+5. Frente = gatilho de memória. Verso = no máximo 2 frases ou tópicos curtos.
+6. NÃO mencione a aluna Anne. NÃO pergunte autor, data, metadados, formato de arquivo ou nome do PDF.
+7. Priorize conceitos-chave (maior peso), mas cubra o restante do material.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
@@ -198,14 +215,8 @@ ${prohibitionBlock}${focusBlock}
 TAREFA:
 Gere ${count} flashcards inéditos com base estritamente nos conceitos da matéria.
 
-REGRAS:
-1. Cada card foca UM conceito da disciplina (definição, mecanismo, comparação ou uso).
-2. Frente = gatilho de memória. Verso = no máximo 2 frases.
-3. NÃO mencione a aluna Anne. NÃO pergunte autor, data, metadados, formato de arquivo ou nome do PDF.
-4. Priorize conceitos-chave (maior peso), mas cubra o restante do material.
-
-FORMATO DE SAÍDA:
-Retorne APENAS um JSON válido, sem markdown:
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
 [
   {
     "front": "...",
@@ -273,7 +284,13 @@ Retorne APENAS um JSON válido, sem markdown:
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% das questões) os tópicos de maior fragilidade/erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um professor elaborando questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
+    const prompt = `Você é um coordenador pedagógico especialista em microlearning. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
+
+REGRAS DE QUALIDADE:
+1. As perguntas devem ser curtas e instigantes.
+2. Evite jargões desnecessários.
+3. Alternativas incorretas devem ser confusões reais da disciplina.
+4. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
@@ -292,12 +309,8 @@ PROIBIDO:
 - Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura do arquivo.
 - Interpretação de uma linha isolada de cabeçalho/rodapé.
 
-REGRAS:
-1. Alternativas incorretas devem ser confusões reais da disciplina.
-2. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
-
-FORMATO DE SAÍDA:
-Retorne APENAS um JSON válido, sem markdown:
+ESTRUTURA E FORMATO DE SAÍDA:
+Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown como \`\`\`json. Apenas o JSON puro.
 [
   {
     "prompt": "...",

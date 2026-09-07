@@ -4,6 +4,7 @@ export interface MaterialMongoDocument {
   _id: string;
   studentId: string;
   title: string;
+  subject?: string;
   format: MaterialFormat;
   fileUrl: string;
   fileSizeBytes: number;

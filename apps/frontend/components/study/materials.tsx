@@ -38,6 +38,7 @@ function mapBackendMaterial(m: any): UploadItem {
   return {
     id: m.id,
     name: m.title,
+    subject: m.subject || m.tags?.[0] || 'Geral',
     kind: mapFormatToKind(m.format),
     size: `${Math.round(((m.fileSizeBytes || 1048576) / 1024 / 1024) * 10) / 10} MB`,
     status,
@@ -99,6 +100,10 @@ function sleep(ms: number) {
 export function Materials() {
   const { user } = useAuth()
   const [uploads, setUploads] = useState<UploadItem[]>([])
+  const userSubjects = user?.subjects && user.subjects.length > 0
+    ? user.subjects
+    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+  const [selectedSubject, setSelectedSubject] = useState<string>(userSubjects[0] || 'Geral')
   const bffUrl = getApiUrl()
 
   const studentId = user?.id || 'guest-student'
@@ -167,6 +172,7 @@ export function Materials() {
       return {
         id: `mat-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 4)}`,
         name: file.name,
+        subject: selectedSubject,
         kind,
         size: `${sizeMb === '0.0' ? '0.5' : sizeMb} MB`,
         status: 'processing',
@@ -205,6 +211,7 @@ export function Materials() {
           body: JSON.stringify({
             studentId,
             title: file.name,
+            subject: selectedSubject,
             format: itemMeta.kind,
             mimeType: file.type || 'application/pdf',
             content: fileContent.trim().length > 10 ? fileContent : undefined,
@@ -224,6 +231,7 @@ export function Materials() {
                 ? {
                     ...item,
                     id: serverId,
+                    subject: data.material?.subject || selectedSubject,
                     status: mappedStatus,
                     detail: mappedStatus === 'done' ? 'Processado com IA' : mappedStatus === 'failed' ? (data.message || 'Falha no processamento') : 'Processando com IA…',
                   }
@@ -289,7 +297,12 @@ export function Materials() {
 
   return (
     <div className="flex flex-col gap-6">
-      <UploadZone onFiles={handleFiles} />
+      <UploadZone
+        subjects={userSubjects}
+        selectedSubject={selectedSubject}
+        onSubjectChange={setSelectedSubject}
+        onFiles={handleFiles}
+      />
 
       <Card>
         <CardHeader className="flex-row items-center justify-between">
@@ -319,7 +332,14 @@ export function Materials() {
                     <Icon className="size-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium leading-tight">{item.name}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="truncate text-sm font-medium leading-tight">{item.name}</p>
+                      {item.subject && (
+                        <Badge variant="neutral" className="text-[10px] py-0 px-1.5 shrink-0">
+                          {item.subject}
+                        </Badge>
+                      )}
+                    </div>
                     <p className="truncate text-xs text-muted-foreground">
                       {item.kind} · {item.size} — {item.detail}
                     </p>

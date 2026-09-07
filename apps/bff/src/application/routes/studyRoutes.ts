@@ -115,7 +115,7 @@ export async function studyRoutes(app: FastifyInstance) {
   // Rota de Upload de Material (Suporta PDF, PPT, Áudio, Vídeo e Imagens JPG/PNG/WebP)
   app.post('/api/materials/upload', async (request, reply) => {
     const body = request.body as any;
-    const { studentId = 'anne-student-1', title, format, mimeType = 'text/plain', fileUrl, content, fileBase64, fileSizeBytes = 1024 } = body || {};
+    const { studentId = 'anne-student-1', title, subject, format, mimeType = 'text/plain', fileUrl, content, fileBase64, fileSizeBytes = 1024 } = body || {};
 
     if (!title || !format) {
       return reply.status(400).send({
@@ -132,6 +132,7 @@ export async function studyRoutes(app: FastifyInstance) {
         body: JSON.stringify({
           studentId,
           title,
+          subject,
           format: normalizeClientFormat(format),
           fileUrl: fileUrl || `https://r2.estuda-anne.local/${Date.now()}-${title}`,
           fileSizeBytes,

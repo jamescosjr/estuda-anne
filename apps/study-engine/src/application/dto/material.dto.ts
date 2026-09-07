@@ -16,6 +16,7 @@ const materialFormatSchema = z.string().min(1).transform((value, ctx) => {
 export const CreateMaterialSchema = z.object({
   studentId: z.string().min(1),
   title: z.string().min(3).max(200),
+  subject: z.string().optional(),
   format: materialFormatSchema,
   fileUrl: z.string().min(1),
   fileSizeBytes: z.number().positive(),

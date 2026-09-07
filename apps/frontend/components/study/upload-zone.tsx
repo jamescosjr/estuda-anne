@@ -13,10 +13,13 @@ const acceptedTypes = [
 ]
 
 interface UploadZoneProps {
+  subjects?: string[]
+  selectedSubject?: string
+  onSubjectChange?: (subject: string) => void
   onFiles?: (files: File[]) => void
 }
 
-export function UploadZone({ onFiles }: UploadZoneProps) {
+export function UploadZone({ subjects = [], selectedSubject = 'Geral', onSubjectChange, onFiles }: UploadZoneProps) {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -27,6 +30,29 @@ export function UploadZone({ onFiles }: UploadZoneProps) {
 
   return (
     <div>
+      {/* Seletor de Matéria para Associação do Material */}
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3">
+        <label htmlFor="material-subject-select" className="text-xs font-semibold text-foreground shrink-0">
+          Matéria do Material:
+        </label>
+        <select
+          id="material-subject-select"
+          value={selectedSubject}
+          onChange={(e) => onSubjectChange?.(e.target.value)}
+          className="h-8 flex-1 max-w-xs rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          {subjects.length === 0 ? (
+            <option value="Geral">Geral / Sem Matéria</option>
+          ) : (
+            subjects.map((sub) => (
+              <option key={sub} value={sub}>
+                {sub}
+              </option>
+            ))
+          )}
+        </select>
+      </div>
+
       <div
         onDragOver={(e) => {
           e.preventDefault()
@@ -66,11 +92,11 @@ export function UploadZone({ onFiles }: UploadZoneProps) {
           Arraste e solte seus arquivos ou fotos de provas aqui
         </p>
         <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
-          Ou clique para selecionar. A Anne aceita apostilas, slides e imagens de exercícios para gerar resumos e quizzes.
+          Ou clique para selecionar. A Anne associará o material à matéria <strong className="text-foreground">{selectedSubject}</strong> e gerará resumos e quizzes.
         </p>
         <Button className="mt-5" size="lg">
           <FileUp />
-          Selecionar arquivos ou fotos
+          Selecionar arquivos para {selectedSubject}
         </Button>
         <input
           ref={inputRef}
