@@ -40,4 +40,17 @@ describe('DocumentTextExtractor', () => {
     });
     expect(result).toContain('limites');
   });
+
+  it('extrai texto de um PDF com stream comprimido (FlateDecode)', async () => {
+    const { deflateSync } = await import('node:zlib');
+    const innerText = 'BT (Conceito de calculo diferencial) Tj ET';
+    const compressed = deflateSync(Buffer.from(innerText, 'latin1'));
+
+    const pdfHeader = Buffer.from('%PDF-1.4\nstream\r\n', 'latin1');
+    const pdfFooter = Buffer.from('\r\nendstream\n', 'latin1');
+    const pdf = Buffer.concat([pdfHeader, compressed, pdfFooter]);
+
+    const extracted = extractTextFromPdfBuffer(pdf);
+    expect(extracted).toContain('Conceito de calculo diferencial');
+  });
 });

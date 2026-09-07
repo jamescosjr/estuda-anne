@@ -108,7 +108,7 @@ export class ProcessMaterialUseCase {
       }
 
       if (!rawText || rawText.trim().length === 0) {
-        throw new Error('No content available for AI processing');
+        throw new Error('Não foi possível extrair texto do arquivo (PDF sem camada de texto selecionável ou digitalizado). Envie um documento com texto selecionável.');
       }
 
       material.setRawContent(rawText);

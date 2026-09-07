@@ -1,4 +1,4 @@
-import { inflateRawSync } from 'node:zlib';
+import { inflateSync, inflateRawSync } from 'node:zlib';
 import { IContentExtractor, ExtractTextInput } from '../../domain/ports/IContentExtractor.js';
 
 function decodePdfString(raw: string): string {
@@ -41,15 +41,68 @@ function extractPdfLiteralStrings(src: string, operator: 'Tj' | 'TJ'): string[] 
   return chunks;
 }
 
+function extractTextFromPdfStreams(buffer: Buffer): string[] {
+  const chunks: string[] = [];
+  const streamHeader = Buffer.from('stream');
+  const endStreamHeader = Buffer.from('endstream');
+
+  let pos = 0;
+  while (pos < buffer.length) {
+    const streamIdx = buffer.indexOf(streamHeader, pos);
+    if (streamIdx === -1) break;
+
+    let start = streamIdx + streamHeader.length;
+    if (buffer[start] === 0x0d) start++;
+    if (buffer[start] === 0x0a) start++;
+
+    const endIdx = buffer.indexOf(endStreamHeader, start);
+    if (endIdx === -1) break;
+
+    let end = endIdx;
+    if (end > start && (buffer[end - 1] === 0x0a || buffer[end - 1] === 0x0d)) end--;
+    if (end > start && (buffer[end - 1] === 0x0a || buffer[end - 1] === 0x0d)) end--;
+
+    if (end > start) {
+      const streamBytes = buffer.subarray(start, end);
+      let inflated: Buffer | null = null;
+      try {
+        inflated = inflateSync(streamBytes);
+      } catch {
+        try {
+          inflated = inflateRawSync(streamBytes);
+        } catch {
+          inflated = null;
+        }
+      }
+
+      if (inflated) {
+        const text = inflated.toString('latin1');
+        const tj = extractPdfLiteralStrings(text, 'Tj');
+        const TJ = extractPdfLiteralStrings(text, 'TJ');
+        chunks.push(...tj, ...TJ);
+      }
+    }
+
+    pos = endIdx + endStreamHeader.length;
+  }
+
+  return chunks;
+}
+
 export function extractTextFromPdfBuffer(buffer: Buffer): string {
   const maxBytes = Math.min(buffer.length, 8 * 1024 * 1024);
   const src = buffer.subarray(0, maxBytes).toString('latin1');
-  const chunks = [
+  let chunks = [
     ...extractPdfLiteralStrings(src, 'Tj'),
     ...extractPdfLiteralStrings(src, 'TJ'),
-  ].filter((chunk) => !isPdfMetadataChunk(chunk));
+  ];
 
-  return chunks.join(' ').replace(/\s+/g, ' ').trim();
+  if (chunks.length === 0) {
+    chunks = extractTextFromPdfStreams(buffer);
+  }
+
+  const filtered = chunks.filter((chunk) => !isPdfMetadataChunk(chunk));
+  return filtered.join(' ').replace(/\s+/g, ' ').trim();
 }
 
 export function readZipLocalEntries(buffer: Buffer): Array<{ name: string; data: Buffer }> {
