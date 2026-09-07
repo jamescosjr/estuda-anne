@@ -9,6 +9,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -142,6 +143,56 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(quiz[0].explanation).toBe(
         'A opção 0 é a correta pois os tempos são não negativos. A opção 3 está incorreta pois Prim calcula MST, não o caminho mínimo a partir da origem.'
       );
+    });
+
+    it('retenta generateContent ate 3 vezes em 503 com backoff exponencial', async () => {
+      vi.useFakeTimers();
+      const successBody = {
+        candidates: [
+          {
+            content: {
+              parts: [
+                {
+                  text: JSON.stringify([
+                    { front: 'O que e Dijkstra?', back: 'Caminho minimo com pesos nao negativos.' },
+                  ]),
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const mockFetch = vi.fn()
+        .mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Service Unavailable' })
+        .mockResolvedValueOnce({ ok: false, status: 503, statusText: 'Service Unavailable' })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => successBody,
+        });
+
+      vi.stubGlobal('fetch', mockFetch);
+      const adapter = new GeminiFlashAdapter(mockApiKey);
+      const pending = adapter.generateFlashcards(sampleMaterial, 1);
+      const cards = await vi.runAllTimersAsync().then(() => pending);
+
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(cards[0].front).toBe('O que e Dijkstra?');
+      vi.useRealTimers();
+    });
+
+    it('nao retenta erros 400 permanentes', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+      });
+      vi.stubGlobal('fetch', mockFetch);
+      const adapter = new GeminiFlashAdapter(mockApiKey);
+
+      await expect(adapter.generateFlashcards(sampleMaterial, 1)).rejects.toThrow(/400/);
+      expect(mockFetch).toHaveBeenCalledOnce();
     });
   });
 });

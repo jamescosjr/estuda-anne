@@ -8,30 +8,62 @@ import {
 import { env } from '../config/env.js';
 import { logStructured } from '../observability/structuredLog.js';
 
+export const GEMINI_RETRY = {
+  maxAttempts: 3,
+  baseDelayMs: 1000,
+} as const;
+
+function isRetryableGeminiStatus(status: number): boolean {
+  return status === 408 || status === 429 || status >= 500;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function geminiFetch(url: string, init: RequestInit, operation = 'gemini_generate'): Promise<Response> {
-  const started = Date.now();
-  try {
-    const response = await fetch(url, init);
-    logStructured({
-      service: 'study-engine',
-      event: 'gemini_call',
-      operation,
-      status: response.status,
-      durationMs: Date.now() - started,
-      ok: response.ok,
-    });
-    return response;
-  } catch (error) {
-    logStructured({
-      service: 'study-engine',
-      event: 'gemini_call',
-      operation,
-      durationMs: Date.now() - started,
-      ok: false,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= GEMINI_RETRY.maxAttempts; attempt++) {
+    const started = Date.now();
+    try {
+      const response = await fetch(url, init);
+      const retryable = !response.ok && isRetryableGeminiStatus(response.status);
+      logStructured({
+        service: 'study-engine',
+        event: 'gemini_call',
+        operation,
+        status: response.status,
+        durationMs: Date.now() - started,
+        ok: response.ok,
+        attempt,
+      });
+
+      if (!retryable || attempt === GEMINI_RETRY.maxAttempts) {
+        return response;
+      }
+
+      await sleep(GEMINI_RETRY.baseDelayMs * 2 ** (attempt - 1));
+    } catch (error) {
+      lastError = error;
+      logStructured({
+        service: 'study-engine',
+        event: 'gemini_call',
+        operation,
+        durationMs: Date.now() - started,
+        ok: false,
+        attempt,
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      if (attempt === GEMINI_RETRY.maxAttempts) {
+        throw error;
+      }
+      await sleep(GEMINI_RETRY.baseDelayMs * 2 ** (attempt - 1));
+    }
   }
+
+  throw lastError instanceof Error ? lastError : new Error('Gemini Flash API unavailable');
 }
 
 export class GeminiFlashAdapter implements ILanguageModelService {
