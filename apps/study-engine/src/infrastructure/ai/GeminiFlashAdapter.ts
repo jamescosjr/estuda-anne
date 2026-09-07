@@ -389,6 +389,7 @@ REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
 2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas. A pergunta contextualiza o tema sem depender de texto externo. O verso deve ser direto e pedagogicamente rico (2 a 3 frases explicativas).
 3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado" ou "autor".
 4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
+5. PROGRESSÃO GRADATIVA E ENCADECAMENTO DE PRÉ-REQUISITOS: Os ${count} flashcards DEVEM respeitar o encadeamento lógico do aprendizado (do conceito mais fundamental/pré-requisito que sustenta o assunto até as suas aplicações/derivações mais avançadas). Nunca cobre um conceito avançado sem antes consolidar o pré-requisito base.
 ${conceptsBlock}${prohibitionBlock}${focusBlock}
 TAREFA:
 Gere ${count} flashcards profissionais, distintos, variados e auto-contidos sobre a disciplina.
@@ -422,6 +423,7 @@ REGRAS RÍGIDAS DE QUALIDADE (OBRIGATÓRIAS):
 2. CONTEÚDO 100% AUTO-CONTIDO: Tanto a pergunta (frente) quanto a resposta (verso) devem ser totalmente auto-explicativas. A pergunta deve contextualizar o conceito sem depender de texto externo. O verso deve ser completo, claro e pedagogicamente rico (2 a 3 frases explicativas ou tópicos diretos).
 3. ZERO REFERÊNCIAS A ARQUIVO/PDF/ESTRUTURA: É ESTRITAMENTE PROIBIDO usar palavras como "PDF", "documento", "arquivo", "página", "item", "seção", "anexo", "texto enviado", "conforme o texto", "de acordo com o texto" ou "autor". O flashcard deve tratar puramente da ciência/conceito da matéria.
 4. ZERO PERSONAGENS OU METADADOS: NUNCA mencione a estudante Anne. NUNCA pergunte sobre datas, autores, metadados ou formatações.
+5. PROGRESSÃO GRADATIVA E ENCADECAMENTO DE PRÉ-REQUISITOS: Os ${count} flashcards DEVEM respeitar o encadeamento lógico do aprendizado (do conceito mais fundamental/pré-requisito que sustenta o assunto até as suas aplicações/derivações mais avançadas). Nunca cobre um conceito avançado sem antes consolidar o pré-requisito base.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
@@ -522,6 +524,7 @@ REGRAS DE QUALIDADE:
 3. Alternativas incorretas devem ser confusões reais da disciplina.
 4. VARIABILIDADE DA RESPOSTA CORRETA (MUITO IMPORTANTE): Distribua a alternativa correta de forma variada e equilibrada entre as posições 0, 1, 2 e 3 (Opções A, B, C e D). NUNCA coloque a resposta certa sempre na opção 0 / Opção A.
 5. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
+6. PROGRESSÃO GRADATIVA E ENCADECAMENTO DE PRÉ-REQUISITOS: Apresente as questões na ordem lógica de dependência (começando pelas questões dos conceitos fundamentais e pré-requisitos de base, avançando progressivamente para aplicação e síntese).
 ${prohibitionBlock}${focusBlock}
 TAREFA:
 Gere ${questionsCount} questões de múltipla escolha inéditas cobrindo o material.
@@ -587,6 +590,7 @@ REGRAS DE QUALIDADE:
 3. Alternativas incorretas devem ser confusões reais da disciplina.
 4. VARIABILIDADE DA RESPOSTA CORRETA (MUITO IMPORTANTE): Distribua a alternativa correta de forma variada e equilibrada entre as posições 0, 1, 2 e 3 (Opções A, B, C e D). NUNCA coloque a resposta certa sempre na opção 0 / Opção A.
 5. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
+6. PROGRESSÃO GRADATIVA E ENCADECAMENTO DE PRÉ-REQUISITOS: Apresente as questões na ordem lógica de dependência (começando pelas questões dos conceitos fundamentais e pré-requisitos de base, avançando progressivamente para aplicação e síntese).
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
