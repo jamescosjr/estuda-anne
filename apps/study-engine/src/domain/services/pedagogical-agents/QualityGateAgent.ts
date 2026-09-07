@@ -1,5 +1,6 @@
 import { Flashcard } from '../../entities/Flashcard.js';
 import { Quiz } from '../../entities/Quiz.js';
+import { isPedagogicallyOffTopic } from '../StudyCorpusSanitizer.js';
 
 export interface QualityCheckResult {
   passed: boolean;
@@ -43,6 +44,13 @@ export class QualityGateAgent {
         const normalizedPrompt = q.prompt.trim().toLowerCase();
         if (questionPrompts.has(normalizedPrompt)) {
           return { passed: false, score: 70, reason: 'Perguntas duplicadas detectadas no quiz' };
+        }
+        if (isPedagogicallyOffTopic(q.prompt)) {
+          return {
+            passed: false,
+            score: 65,
+            reason: 'Pergunta fora do conteúdo da matéria (metadados, data de arquivo ou personagem Anne)',
+          };
         }
         questionPrompts.add(normalizedPrompt);
 

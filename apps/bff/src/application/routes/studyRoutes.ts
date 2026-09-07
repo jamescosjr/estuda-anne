@@ -204,7 +204,8 @@ export async function studyRoutes(app: FastifyInstance) {
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/due?studentId=${encodeURIComponent(studentId)}`);
       if (!res.ok) {
-        return reply.status(res.status).send(await res.json());
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao listar flashcards' }));
+        return reply.status(res.status).send(errJson);
       }
       const data = await res.json();
       return reply.send(data);
@@ -220,13 +221,14 @@ export async function studyRoutes(app: FastifyInstance) {
     const sm2Grade = grade ?? rating;
 
     try {
-      const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/${id}/review`, {
+      const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/${encodeURIComponent(id)}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ grade: sm2Grade, rating: sm2Grade }),
       });
       if (!res.ok) {
-        return reply.status(res.status).send(await res.json());
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao revisar flashcard' }));
+        return reply.status(res.status).send(errJson);
       }
       const data = await res.json();
       return reply.send(data);

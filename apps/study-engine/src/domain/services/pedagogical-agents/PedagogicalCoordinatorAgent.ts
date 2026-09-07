@@ -3,6 +3,7 @@ import { MaterialEvaluatorAgent } from './MaterialEvaluatorAgent.js';
 import { FlashcardSpecialistAgent } from './FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from './QuizSpecialistAgent.js';
 import { QualityGateAgent } from './QualityGateAgent.js';
+import { sanitizeStudyCorpus, toFocusTopics } from '../StudyCorpusSanitizer.js';
 
 export interface CoordinatorPipelineResult {
   materialId: string;
@@ -23,20 +24,24 @@ export class PedagogicalCoordinatorAgent {
   ) {}
 
   public async orchestrateProcessing(material: Material, rawText: string): Promise<CoordinatorPipelineResult> {
+    const studyText = sanitizeStudyCorpus(rawText) || rawText;
+
     // 1. Etapa 1: Invocação do MaterialEvaluatorAgent (Análise + Resumo + RAG especifico)
     const analysis = await this.evaluatorAgent.evaluateAndIndex(
       material.id,
       material.studentId,
-      rawText
+      studyText
     );
+
+    const focusTopics = toFocusTopics(analysis.keyConcepts);
 
     // 2. Etapa 2: Invocação do FlashcardSpecialistAgent (Cartões pedagógicos de retenção)
     const flashcards = await this.flashcardAgent.generateFlashcards(
       material.id,
       material.studentId,
-      rawText,
+      studyText,
       analysis.keyConcepts,
-      undefined,
+      focusTopics,
       false
     );
 
@@ -44,8 +49,8 @@ export class PedagogicalCoordinatorAgent {
       material.id,
       material.studentId,
       material.title,
-      rawText,
-      undefined,
+      studyText,
+      focusTopics,
       false
     );
 

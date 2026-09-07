@@ -58,9 +58,6 @@ export class Flashcard {
     }
 
     const now = new Date();
-    // Default initial review is set to tomorrow (1 day interval)
-    const initialNextReview = new Date(now);
-    initialNextReview.setDate(initialNextReview.getDate() + 1);
 
     return new Flashcard({
       id: props.id || crypto.randomUUID(),
@@ -71,7 +68,7 @@ export class Flashcard {
       repetitionIntervalDays: 1,
       easeFactor: Flashcard.DEFAULT_EASE_FACTOR,
       repetitionsCount: 0,
-      nextReviewDate: initialNextReview,
+      nextReviewDate: now,
       tags: props.tags ?? [],
       history: [],
       createdAt: now,

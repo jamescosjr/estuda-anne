@@ -15,6 +15,7 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
     expect(card.easeFactor).toBe(2.5);
     expect(card.repetitionIntervalDays).toBe(1);
     expect(card.repetitionsCount).toBe(0);
+    expect(card.isDue(new Date())).toBe(true);
     expect(card.history).toHaveLength(0);
   });
 

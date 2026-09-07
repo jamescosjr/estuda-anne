@@ -1,5 +1,6 @@
 import { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import { ZodError } from 'zod';
+import { DomainError } from '../../domain/errors/DomainError.js';
 
 function isZodError(error: unknown): error is ZodError {
   if (error instanceof ZodError) {
@@ -20,6 +21,15 @@ export function errorHandler(error: FastifyError, _request: FastifyRequest, repl
       error: 'Bad Request',
       message: 'Validation failed',
       details: error.errors ?? (error as ZodError).issues,
+    });
+    return;
+  }
+
+  if (error instanceof DomainError) {
+    reply.status(error.statusCode).send({
+      statusCode: error.statusCode,
+      error: error.name,
+      message: error.message,
     });
     return;
   }

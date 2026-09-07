@@ -125,4 +125,34 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
     expect(result.passed).toBe(false);
     expect(result.reason).toContain('Opções duplicadas');
   });
+
+  it('deve reprovar perguntas sobre metadados, datas de arquivo ou a aluna Anne', () => {
+    const flashcards = [
+      Flashcard.create({ studentId: 'usr-1', materialId: 'mat-1', front: 'O que é um LLM?', back: 'Modelo de linguagem' }),
+    ];
+
+    const quiz = Quiz.create({
+      studentId: 'usr-1',
+      materialId: 'mat-1',
+      title: 'Quiz',
+      questions: [
+        {
+          prompt: 'Qual é o autor do PDF segundo os metadados do arquivo?',
+          options: ['Jane', 'John', 'Anne', 'Ninguém'],
+          correctAnswerIndex: 0,
+          explanation: 'Metadado',
+        },
+      ],
+    });
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo de LLMs',
+      ['llm'],
+      flashcards,
+      quiz
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/fora do conteúdo/i);
+  });
 });

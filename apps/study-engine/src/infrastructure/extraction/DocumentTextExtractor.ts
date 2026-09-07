@@ -11,18 +11,43 @@ function decodePdfString(raw: string): string {
     .replace(/\\\\/g, '\\');
 }
 
-export function extractTextFromPdfBuffer(buffer: Buffer): string {
-  const src = buffer.toString('latin1');
+const PDF_METADATA_KEYS = /\/(Author|Creator|Producer|CreationDate|ModDate|Title|Subject|Keywords)\s*\(/i;
+
+function isPdfMetadataChunk(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed.length < 3) return true;
+  if (/^D:\d{8}/.test(trimmed)) return true;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return true;
+  if (PDF_METADATA_KEYS.test(trimmed)) return true;
+  return false;
+}
+
+function extractPdfLiteralStrings(src: string, operator: 'Tj' | 'TJ'): string[] {
   const chunks: string[] = [];
-
-  for (const match of src.matchAll(/\((?:\\.|[^\\)]){2,}\)\s*Tj/g)) {
-    const inner = match[0].replace(/\s*Tj$/, '').slice(1, -1);
-    chunks.push(decodePdfString(inner));
+  if (operator === 'Tj') {
+    for (const match of src.matchAll(/\((?:\\.|[^\\)]){2,}\)\s*Tj/g)) {
+      const inner = match[0].replace(/\s*Tj$/, '').slice(1, -1);
+      chunks.push(decodePdfString(inner));
+    }
+    return chunks;
   }
 
-  for (const match of src.matchAll(/\((?:\\.|[^\\)]){3,}\)/g)) {
-    chunks.push(decodePdfString(match[0].slice(1, -1)));
+  for (const match of src.matchAll(/\[((?:\\.|[^\]])*)\]\s*TJ/g)) {
+    const arrayBody = match[1];
+    for (const str of arrayBody.matchAll(/\((?:\\.|[^\\)])+\)/g)) {
+      chunks.push(decodePdfString(str[0].slice(1, -1)));
+    }
   }
+  return chunks;
+}
+
+export function extractTextFromPdfBuffer(buffer: Buffer): string {
+  const maxBytes = Math.min(buffer.length, 8 * 1024 * 1024);
+  const src = buffer.subarray(0, maxBytes).toString('latin1');
+  const chunks = [
+    ...extractPdfLiteralStrings(src, 'Tj'),
+    ...extractPdfLiteralStrings(src, 'TJ'),
+  ].filter((chunk) => !isPdfMetadataChunk(chunk));
 
   return chunks.join(' ').replace(/\s+/g, ' ').trim();
 }

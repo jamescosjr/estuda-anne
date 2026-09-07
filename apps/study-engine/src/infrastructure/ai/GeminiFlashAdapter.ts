@@ -23,11 +23,21 @@ function sleep(ms: number): Promise<void> {
 
 async function geminiFetch(url: string, init: RequestInit, operation = 'gemini_generate'): Promise<Response> {
   let lastError: unknown;
+  const timeoutMs = 25000;
+  const body = init.body;
+  const headers = init.headers;
 
   for (let attempt = 1; attempt <= GEMINI_RETRY.maxAttempts; attempt++) {
     const started = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, {
+        method: init.method,
+        headers,
+        body,
+        signal: controller.signal,
+      });
       const retryable = !response.ok && isRetryableGeminiStatus(response.status);
       logStructured({
         service: 'study-engine',
@@ -60,6 +70,8 @@ async function geminiFetch(url: string, init: RequestInit, operation = 'gemini_g
         throw error;
       }
       await sleep(GEMINI_RETRY.baseDelayMs * 2 ** (attempt - 1));
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -94,9 +106,10 @@ export class GeminiFlashAdapter implements ILanguageModelService {
     }
 
     // Chamada HTTP otimizada para o Gemini Flash via API REST (baixo overhead, sem sdk pesado)
-    const prompt = `Analise o seguinte material de estudo e forneça:
-1. Um resumo estruturado e conciso para a estudante Anne.
-2. Até 5 conceitos-chave essenciais.
+    const prompt = `Analise o seguinte material de estudo universitário.
+Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
+1. Um resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
+2. Até 5 conceitos-chave essenciais, priorizando os que mais caem em prova.
 Formato JSON esperado:
 {"summary": "...", "keyConcepts": ["..."]}
 
@@ -177,20 +190,22 @@ ${content.slice(0, 10000)}`;
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
+    const prompt = `Você é um tutor universitário. Gere flashcards para estudar o CONTEÚDO da matéria, não o documento.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
 ${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${count} flashcards inéditos com base estritamente no material acima.
+Gere ${count} flashcards inéditos com base estritamente nos conceitos da matéria.
 
-REGRAS PARA FLASHCARDS:
-1. Seja atômico: cada flashcard deve focar em apenas UM conceito chave.
-2. Formato frente/verso: A frente deve ser um gatilho de memória (pergunta rápida ou termo). O verso deve ter no máximo 2 frases curtas.
+REGRAS:
+1. Cada card foca UM conceito da disciplina (definição, mecanismo, comparação ou uso).
+2. Frente = gatilho de memória. Verso = no máximo 2 frases.
+3. NÃO mencione a aluna Anne. NÃO pergunte autor, data, metadados, formato de arquivo ou nome do PDF.
+4. Priorize conceitos-chave (maior peso), mas cubra o restante do material.
 
 FORMATO DE SAÍDA:
-Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicação, sem formatação markdown em volta:
+Retorne APENAS um JSON válido, sem markdown:
 [
   {
     "front": "...",
@@ -235,9 +250,9 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
       for (let i = 0; i < questionsCount; i++) {
         const sentence = sentences[i % sentences.length] || `tópico de aplicação acadêmica ${i + 1}`;
         questions.push({
-          prompt: `[Estudo de Caso ${i + 1}] Suponha que Anne precisa analisar o seguinte cenário prático relacionado a "${sentence.slice(0, 50)}...": qual a melhor decisão técnica e por quê?`,
+          prompt: `Segundo o material, o que é correto sobre: "${sentence.slice(0, 80)}"?`,
           options: [
-            `Aplicar o modelo direto, fundamentado em ${sentence.slice(0, 30)}.`,
+            `A afirmação descreve um fundamento do conteúdo: ${sentence.slice(0, 40)}.`,
             `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
             `Confundir a hipótese de partida com o resultado de amostragem secundário.`,
             `Desconsiderar as restrições operacionais e atuar apenas no escopo teórico.`,
@@ -258,21 +273,31 @@ Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicaç
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% das questões) os tópicos de maior fragilidade/erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
 
-    const prompt = `Você é um tutor universitário de excelência, especialista em aprendizagem ativa. Seu objetivo é ajudar uma estudante universitária chamada Anne a dominar os conceitos do material fornecido.
+    const prompt = `Você é um professor elaborando questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
 
 MATERIAL BASE:
 ${content.slice(0, 10000)}
 ${prohibitionBlock}${focusBlock}
 TAREFA:
-Gere ${questionsCount} quizzes inéditos com base estritamente no material acima.
+Gere ${questionsCount} questões de múltipla escolha inéditas, cobrindo o material.
 
-REGRAS PARA QUIZZES (Múltipla Escolha):
-1. Crie cenários práticos ou estudos de caso sempre que possível, forçando o pensamento crítico (nível de "Aplicação" e "Análise" da Taxonomia de Bloom).
-2. As alternativas incorretas devem ser âncoras plausíveis, representando conceitos parecidos ou confusões comuns. Não crie alternativas obviamente falsas.
-3. Inclua uma propriedade "explicacao" no JSON detalhando exatamente por que a alternativa correta é a certa e por que a mais plausível entre as erradas está incorreta.
+DISTRIBUIÇÃO (abordar tudo, com foco no que mais importa):
+- ~50% recordação/compreensão dos conceitos-chave (definições, mecanismos, fatos da disciplina).
+- ~30% aplicação (usar o conceito em um problema da matéria).
+- ~20% análise (comparar modelos, causas, limitações).
+Se houver tópicos com peso maior, concentre ~60% neles e mantenha ~40% no restante.
+
+PROIBIDO:
+- Mencionar "Anne", a aluna, ou transformar a estudante em personagem do enunciado.
+- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura do arquivo.
+- Interpretação de uma linha isolada de cabeçalho/rodapé.
+
+REGRAS:
+1. Alternativas incorretas devem ser confusões reais da disciplina.
+2. Inclua "explicacao" dizendo por que a correta está certa e por que a distratora mais plausível erra.
 
 FORMATO DE SAÍDA:
-Retorne APENAS um JSON válido seguindo a estrutura esperada pela nossa aplicação, sem formatação markdown em volta:
+Retorne APENAS um JSON válido, sem markdown:
 [
   {
     "prompt": "...",

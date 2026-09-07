@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { QuizCard } from './quiz-card'
 import { useAuth } from '@/lib/auth-context'
 import { getApiUrl } from '@/lib/api-config'
+import { fetchJson, shuffleInPlace } from '@/lib/http'
+
+const SEEN_QUIZ_KEY = 'estuda-anne.quiz.seen-ids'
 
 const subjectQuestionTemplates: Record<string, { prompt: string; options: { id: string; text: string }[]; correctId: string; explanation: string }[]> = {
   'cálculo': [
@@ -332,12 +335,41 @@ function generateAcademicQuizzes(subjects: string[], targetCount = 5, subjectFil
   return list
 }
 
+function readSeenQuizIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = window.sessionStorage.getItem(SEEN_QUIZ_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return new Set(Array.isArray(parsed) ? parsed : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function rememberSeenQuizIds(ids: string[]) {
+  if (typeof window === 'undefined') return
+  const seen = readSeenQuizIds()
+  ids.forEach((id) => seen.add(id))
+  window.sessionStorage.setItem(SEEN_QUIZ_KEY, JSON.stringify([...seen]))
+}
+
+function pickUnseenQuestions(pool: QuizQuestion[], count: number): QuizQuestion[] {
+  const seen = readSeenQuizIds()
+  const unseen = shuffleInPlace(pool.filter((q) => !seen.has(q.id)))
+  const rest = shuffleInPlace(pool.filter((q) => seen.has(q.id)))
+  const selected = [...unseen, ...rest].slice(0, Math.min(count, pool.length))
+  rememberSeenQuizIds(selected.map((q) => q.id))
+  return selected
+}
+
 const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 
 export function QuizSession() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
+  const [questionPool, setQuestionPool] = useState<QuizQuestion[]>([])
   const [usingDemo, setUsingDemo] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
   const [targetCount, setTargetCount] = useState<number>(5)
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
@@ -349,36 +381,42 @@ export function QuizSession() {
 
   useEffect(() => {
     async function loadQuizzes() {
+      setLoadError(null)
       try {
-        const res = await fetch(`${getApiUrl()}/api/quizzes?studentId=${encodeURIComponent(user?.id || 'guest-student')}`)
-        if (res.ok) {
-          const list = await res.json()
-          if (Array.isArray(list) && list.length > 0) {
-            const mapped: QuizQuestion[] = list.flatMap((quiz: any) =>
-              (quiz.questions || []).map((question: any, idx: number) => ({
-                id: question.id || `${quiz.id}-${idx}`,
-                subject: quiz.title || 'Quiz',
-                prompt: question.prompt,
-                options: (question.options || []).map((text: string, optionIdx: number) => ({
-                  id: String(optionIdx),
-                  text,
-                })),
-                correctId: String(question.correctAnswerIndex ?? 0),
-                explanation: question.explanation || '',
+        const { ok, data } = await fetchJson<any[]>(
+          `${getApiUrl()}/api/quizzes?studentId=${encodeURIComponent(user?.id || 'guest-student')}`,
+        )
+        if (ok && Array.isArray(data) && data.length > 0) {
+          const mapped: QuizQuestion[] = data.flatMap((quiz: any) =>
+            (quiz.questions || []).map((question: any, idx: number) => ({
+              id: question.id || `${quiz.id}-${idx}`,
+              subject: quiz.title || 'Quiz',
+              prompt: question.prompt,
+              options: (question.options || []).map((text: string, optionIdx: number) => ({
+                id: String(optionIdx),
+                text,
               })),
-            )
-            if (mapped.length > 0) {
-              setUsingDemo(false)
-              setQuestions(mapped.slice(0, targetCount))
-              setCurrent(0)
-              return
-            }
+              correctId: String(question.correctAnswerIndex ?? 0),
+              explanation: question.explanation || '',
+            })),
+          )
+          if (mapped.length > 0) {
+            const shuffled = pickUnseenQuestions(mapped, targetCount)
+            setUsingDemo(false)
+            setQuestionPool(mapped)
+            setQuestions(shuffled)
+            setCurrent(0)
+            return
           }
         }
+        if (!ok) {
+          setLoadError('Não foi possível carregar os quizzes agora. Tente de novo em instantes.')
+        }
       } catch {
-        // fallback demo
+        setLoadError('Não foi possível carregar os quizzes agora. Tente de novo em instantes.')
       }
       setUsingDemo(true)
+      setQuestionPool([])
       setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
       setCurrent(0)
     }
@@ -386,9 +424,14 @@ export function QuizSession() {
   }, [userSubjectsKey, targetCount, subjectFilter, user?.id])
 
   function handleStartExtraSession() {
+    setCurrent(0)
+    if (questionPool.length > 0) {
+      setUsingDemo(false)
+      setQuestions(pickUnseenQuestions(questionPool, targetCount))
+      return
+    }
     setUsingDemo(true)
     setQuestions(generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter))
-    setCurrent(0)
   }
 
   const total = questions.length
@@ -440,6 +483,10 @@ export function QuizSession() {
           </div>
         </CardContent>
       </Card>
+
+      {loadError && (
+        <p className="text-xs text-destructive">{loadError}</p>
+      )}
 
       {usingDemo && (
         <p className="text-xs text-muted-foreground">

@@ -34,7 +34,8 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
 
       expect(quiz.length).toBe(2);
       for (const q of quiz) {
-        expect(q.prompt).toContain('Estudo de Caso');
+        expect(q.prompt).toContain('Segundo o material');
+        expect(q.prompt.toLowerCase()).not.toContain('anne');
         expect(q.options.length).toBe(4);
         expect(q.correctAnswerIndex).toBeGreaterThanOrEqual(0);
         expect(q.correctAnswerIndex).toBeLessThanOrEqual(3);
@@ -84,9 +85,10 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(capturedRequestBody.generationConfig.responseMimeType).toBe('application/json');
 
       const promptText = capturedRequestBody.contents[0].parts[0].text;
-      expect(promptText).toContain('Você é um tutor universitário de excelência');
-      expect(promptText).toContain('Seja atômico: cada flashcard deve focar em apenas UM conceito chave');
+      expect(promptText).toContain('Você é um tutor universitário');
+      expect(promptText).toContain('UM conceito');
       expect(promptText).toContain('MATERIAL BASE:');
+      expect(promptText).toContain('NÃO mencione a aluna Anne');
 
       expect(cards.length).toBe(1);
       expect(cards[0].front).toBe('Qual a pré-condição dos pesos no algoritmo de Dijkstra?');
@@ -136,8 +138,10 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(capturedRequestBody.generationConfig.temperature).toBe(0.6);
 
       const promptText = capturedRequestBody.contents[0].parts[0].text;
-      expect(promptText).toContain('Taxonomia de Bloom');
+      expect(promptText).toContain('recordação/compreensão');
       expect(promptText).toContain('explicacao');
+      expect(promptText).toContain('NÃO é o tema das perguntas');
+      expect(promptText.toLowerCase()).toContain('metadados');
 
       expect(quiz.length).toBe(1);
       expect(quiz[0].explanation).toBe(

@@ -1,6 +1,7 @@
 import { Quiz } from '../../entities/Quiz.js';
 import { IQuizRepository } from '../../ports/IQuizRepository.js';
 import { ILanguageModelService } from '../../ports/ILanguageModelService.js';
+import { isPedagogicallyOffTopic } from '../StudyCorpusSanitizer.js';
 
 export class QuizSpecialistAgent {
   constructor(
@@ -28,11 +29,11 @@ export class QuizSpecialistAgent {
 
     if (!quizQuestions || quizQuestions.length === 0) return null;
 
-    // Deduplicação estrita contra banco e no próprio lote
     const seenPrompts = new Set(existingPrompts.map(p => p.trim().toLowerCase()));
     quizQuestions = quizQuestions.filter(q => {
       const norm = q.prompt.trim().toLowerCase();
       if (seenPrompts.has(norm)) return false;
+      if (isPedagogicallyOffTopic(q.prompt)) return false;
       seenPrompts.add(norm);
       return true;
     });

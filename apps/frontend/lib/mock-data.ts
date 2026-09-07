@@ -53,6 +53,7 @@ export interface FlashcardItem {
   subject: string
   front: string
   back: string
+  persisted?: boolean
 }
 
 export const courseProgress: CourseProgress[] = [

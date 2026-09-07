@@ -1,5 +1,6 @@
 import { ReviewGrade, isValidReviewGrade } from '../value-objects/index.js';
 import { IFlashcardRepository } from '../ports/index.js';
+import { NotFoundError } from '../errors/DomainError.js';
 
 export interface ReviewFlashcardInput {
   flashcardId: string;
@@ -25,7 +26,7 @@ export class ReviewFlashcardUseCase {
 
     const flashcard = await this.flashcardRepository.findById(input.flashcardId);
     if (!flashcard) {
-      throw new Error(`Flashcard with ID ${input.flashcardId} not found`);
+      throw new NotFoundError(`Flashcard with ID ${input.flashcardId} not found`);
     }
 
     flashcard.applyReview(input.grade as ReviewGrade);

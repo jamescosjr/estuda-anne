@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Flashcard, type Difficulty } from './flashcard'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
+import { fetchJson, shuffleInPlace } from '@/lib/http'
 
 const academicFlashcardTemplates: Record<string, { front: string; back: string }[]> = {
   'cálculo': [
@@ -100,6 +101,7 @@ function generateAcademicFlashcards(subjects: string[], targetCount = 5, subject
             subject: sub,
             front: t.front,
             back: t.back,
+            persisted: false,
           })
           if (list.length >= targetCount) break
         }
@@ -122,6 +124,7 @@ function generateAcademicFlashcards(subjects: string[], targetCount = 5, subject
         subject: sub,
         front: uniqueFront,
         back: `A disciplina de ${sub} desenvolve o raciocínio analítico para resolução de problemas e consolidação de competências técnicas requeridas nos exames.`,
+        persisted: false,
       })
     }
     fillIdx++
@@ -135,7 +138,9 @@ const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas 
 export function ReviewSession() {
   const { user } = useAuth()
   const [cards, setCards] = useState<FlashcardItem[]>([])
+  const [persistedPool, setPersistedPool] = useState<FlashcardItem[]>([])
   const [usingDemo, setUsingDemo] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [current, setCurrent] = useState(0)
   const [done, setDone] = useState(false)
   const [targetCount, setTargetCount] = useState<number>(5)
@@ -150,27 +155,33 @@ export function ReviewSession() {
 
   useEffect(() => {
     async function loadDueCards() {
+      setLoadError(null)
       try {
-        const res = await fetch(`${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`)
-        if (res.ok) {
-          const list = await res.json()
-          if (Array.isArray(list) && list.length > 0) {
-            const mapped: FlashcardItem[] = list.map((fc: any) => ({
-              id: fc.id,
-              subject: fc.topic || 'Conceito Geral',
-              front: fc.front,
-              back: fc.back,
-            }))
-            setCards(mapped)
-            setUsingDemo(false)
-            return
-          }
+        const { ok, data } = await fetchJson<any[]>(
+          `${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`,
+        )
+        if (ok && Array.isArray(data) && data.length > 0) {
+          const mapped: FlashcardItem[] = data.map((fc: any) => ({
+            id: fc.id,
+            subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
+            front: fc.front,
+            back: fc.back,
+            persisted: true,
+          }))
+          setPersistedPool(mapped)
+          setCards(mapped.slice(0, targetCount))
+          setUsingDemo(false)
+          return
         }
-      } catch (err) {
-        // Fallback local
+        if (!ok) {
+          setLoadError('Não foi possível carregar os flashcards agora. Tente de novo em instantes.')
+        }
+      } catch {
+        setLoadError('Não foi possível carregar os flashcards agora. Tente de novo em instantes.')
       }
 
       setUsingDemo(true)
+      setPersistedPool([])
       setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
     }
 
@@ -178,10 +189,15 @@ export function ReviewSession() {
   }, [bffUrl, studentId, userSubjectsKey, targetCount, subjectFilter])
 
   function handleStartExtraSession() {
-    setUsingDemo(true)
-    setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
     setCurrent(0)
     setDone(false)
+    if (persistedPool.length > 0) {
+      setUsingDemo(false)
+      setCards(shuffleInPlace(persistedPool).slice(0, Math.min(targetCount, persistedPool.length)))
+      return
+    }
+    setUsingDemo(true)
+    setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
   }
 
   async function handleGrade(difficulty: Difficulty) {
@@ -192,14 +208,16 @@ export function ReviewSession() {
       hard: 1,
     }
 
-    try {
-      await fetch(`${bffUrl}/api/flashcards/${card.id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ grade: ratingMap[difficulty], rating: ratingMap[difficulty] }),
-      })
-    } catch {
-      // Ignora falhas de conexão em modo offline
+    if (card?.persisted) {
+      try {
+        await fetch(`${bffUrl}/api/flashcards/${encodeURIComponent(card.id)}/review`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ grade: ratingMap[difficulty], rating: ratingMap[difficulty] }),
+        })
+      } catch {
+        // Ignora falhas de conexão em modo offline
+      }
     }
 
     if (current === cards.length - 1) {
@@ -287,6 +305,10 @@ export function ReviewSession() {
           </div>
         </CardContent>
       </Card>
+
+      {loadError && (
+        <p className="text-xs text-destructive">{loadError}</p>
+      )}
 
       {usingDemo && (
         <p className="text-xs text-muted-foreground">

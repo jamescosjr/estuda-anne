@@ -21,6 +21,17 @@ describe('DocumentTextExtractor', () => {
     expect(extractTextFromPdfBuffer(pdf)).toContain('Cidadania');
   });
 
+  it('ignora metadados de Info (Author, CreationDate) e nao varre parenteses soltos', () => {
+    const pdf = Buffer.from(
+      '%PDF-1.1\n/Author (Jane Doe)\n/CreationDate (D:20240101120000Z)\nBT (Fine-tuning adapta o modelo) Tj ET\n',
+      'latin1'
+    );
+    const text = extractTextFromPdfBuffer(pdf);
+    expect(text).toContain('Fine-tuning');
+    expect(text).not.toContain('Jane Doe');
+    expect(text).not.toContain('D:20240101');
+  });
+
   it('prioriza textContent quando ja existe', async () => {
     const extractor = new DocumentTextExtractor();
     const result = await extractor.extractText({
