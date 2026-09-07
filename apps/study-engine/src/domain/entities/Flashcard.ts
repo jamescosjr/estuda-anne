@@ -59,8 +59,13 @@ export class Flashcard {
 
     const now = new Date();
 
+    let cardId = props.id;
+    if (!cardId || cardId.startsWith('fc-gen-') || cardId.startsWith('fc-')) {
+      cardId = crypto.randomUUID();
+    }
+
     return new Flashcard({
-      id: props.id || crypto.randomUUID(),
+      id: cardId,
       studentId: props.studentId,
       materialId: props.materialId,
       front: props.front.trim(),

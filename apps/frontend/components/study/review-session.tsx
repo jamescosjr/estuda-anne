@@ -161,13 +161,16 @@ export function ReviewSession() {
           `${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`,
         )
         if (ok && Array.isArray(data) && data.length > 0) {
-          const mapped: FlashcardItem[] = data.map((fc: any) => ({
-            id: fc.id,
-            subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
-            front: fc.front,
-            back: fc.back,
-            persisted: true,
-          }))
+          const mapped: FlashcardItem[] = data.map((fc: any) => {
+            const isRealId = Boolean(fc.id && !fc.id.startsWith('fc-gen-') && !fc.id.startsWith('fc-'))
+            return {
+              id: fc.id,
+              subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
+              front: fc.front,
+              back: fc.back,
+              persisted: isRealId,
+            }
+          })
           setPersistedPool(mapped)
           setCards(mapped.slice(0, targetCount))
           setUsingDemo(false)
@@ -208,7 +211,11 @@ export function ReviewSession() {
       hard: 1,
     }
 
-    if (card?.persisted) {
+    const isRealDbCard = Boolean(
+      card?.persisted && card?.id && !card.id.startsWith('fc-gen-') && !card.id.startsWith('fc-')
+    )
+
+    if (isRealDbCard) {
       try {
         await fetch(`${bffUrl}/api/flashcards/${encodeURIComponent(card.id)}/review`, {
           method: 'POST',

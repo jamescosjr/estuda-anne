@@ -84,4 +84,18 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
 
     expect(card.easeFactor).toBeGreaterThanOrEqual(1.3);
   });
+
+  it('should discard temporary fc-gen- or fc- ID prefix and generate a real UUID', () => {
+    const card = Flashcard.create({
+      id: 'fc-gen-Calculo-1',
+      studentId: 'student-123',
+      materialId: 'material-456',
+      front: 'O que e limite?',
+      back: 'Conceito fundamental.',
+    });
+
+    expect(card.id).not.toContain('fc-gen-');
+    expect(card.id).not.toContain('fc-');
+    expect(card.id.length).toBeGreaterThan(20);
+  });
 });
