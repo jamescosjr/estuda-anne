@@ -480,9 +480,9 @@ Formato JSON estrito esperado:
       });
       uploadedFile = uploadResult.file;
 
-      // 3. Inicializa SDK oficial GoogleGenerativeAI com gemini-1.5-flash
+      // 3. Inicializa SDK oficial GoogleGenerativeAI com gemini-3.6-flash
       const genAI = new GoogleGenerativeAI(this.apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.6-flash' });
 
       const prompt = `Você é um coordenador pedagógico especialista em microlearning.
 Extraia e transcreva todo o texto e conteúdo acadêmico relevante presente neste documento/imagem/PDF.
