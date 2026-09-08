@@ -14,6 +14,9 @@ export async function bootstrapBFF() {
     logger: true,
     ignoreTrailingSlash: true,
     bodyLimit: 104857600,
+    requestTimeout: 180000,
+    connectionTimeout: 180000,
+    keepAliveTimeout: 185000,
   });
   DailyBriefingListener.initialize();
 

@@ -6,18 +6,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Rewrites proxy Gemini extra-session calls (~40–120s). Default is 30s → ECONNRESET.
+  // Route Handler em app/api/[...path] encaminha ao BFF (rewrites usam httpxy com 30s).
   experimental: {
     proxyTimeout: 180_000,
-  },
-  async rewrites() {
-    const bffInternalUrl = (process.env.BFF_INTERNAL_URL || 'http://bff:3001').replace(/\/+$/, '')
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${bffInternalUrl}/api/:path*`,
-      },
-    ]
   },
 }
 

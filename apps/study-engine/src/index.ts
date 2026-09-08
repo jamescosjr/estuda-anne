@@ -75,6 +75,9 @@ export async function bootstrapStudyEngine(options: BootstrapOptions = {}): Prom
     ignoreTrailingSlash: true,
     pluginTimeout: 120000,
     bodyLimit: 104857600,
+    requestTimeout: 180000,
+    connectionTimeout: 180000,
+    keepAliveTimeout: 185000,
   });
 
   await app.register(cors, {
