@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Trash2, Sparkles, Check, BookOpen, User, GraduationCap, Calendar, Clock, Upload, FileText, Loader2, CalendarDays } from 'lucide-react'
 import { useAuth, ExamDateItem } from '@/lib/auth-context'
 import { getApiUrl } from '@/lib/api-config'
+import { listStudentSubjects } from '@/lib/student-subjects'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,34 +23,55 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
   const [periodEndDate, setPeriodEndDate] = useState(user?.periodEndDate || '')
   const [examDates, setExamDates] = useState<ExamDateItem[]>(user?.examDates || [])
   const [studyGoalMinutes, setStudyGoalMinutes] = useState<number>(user?.studyGoalMinutes || 45)
-  const [subjects, setSubjects] = useState<string[]>(user?.subjects || [])
-
-  // Formulário de Nova Matéria
+  const [subjects, setSubjects] = useState<string[]>(listStudentSubjects(user?.subjects))
   const [newSubject, setNewSubject] = useState('')
-
-  // Formulário de Nova Prova / Exame
   const [examSubject, setExamSubject] = useState('')
   const [examTitle, setExamTitle] = useState('')
   const [examDate, setExamDate] = useState('')
-
-  // Estados de Upload / Análise Inteligente de Cronograma
   const [isAnalyzingFile, setIsAnalyzingFile] = useState(false)
   const [fileAnalysisMessage, setFileAnalysisMessage] = useState<string | null>(null)
-
   const [isSaving, setIsSaving] = useState(false)
   const [successMessage, setSuccessMessage] = useState(false)
+
+  useEffect(() => {
+    setSubjects(listStudentSubjects(user?.subjects))
+  }, [user?.subjects])
 
   function handleAddSubject(e?: React.FormEvent) {
     if (e) e.preventDefault()
     const trimmed = newSubject.trim()
     if (trimmed && !subjects.includes(trimmed)) {
-      setSubjects([...subjects, trimmed])
+      void persistSubjects([...subjects, trimmed])
       setNewSubject('')
     }
   }
 
   function handleRemoveSubject(subjectToRemove: string) {
-    setSubjects(subjects.filter((s) => s !== subjectToRemove))
+    const nextSubjects = subjects.filter((s) => s !== subjectToRemove)
+    const nextExams = examDates.filter((exam) => exam.subject !== subjectToRemove)
+    setExamDates(nextExams)
+    void persistSubjects(nextSubjects, nextExams)
+  }
+
+  async function persistSubjects(nextSubjects: string[], nextExams = examDates) {
+    const previousSubjects = subjects
+    const previousExams = examDates
+    setSubjects(nextSubjects)
+    const result = await updateProfile({
+      name,
+      course,
+      period,
+      periodStartDate,
+      periodEndDate,
+      examDates: nextExams,
+      subjects: nextSubjects,
+      studyGoalMinutes,
+    })
+    if (!result.success) {
+      setSubjects(previousSubjects)
+      setExamDates(previousExams)
+      alert(result.error || 'Não foi possível atualizar as matérias no perfil.')
+    }
   }
 
   function handleAddExam(e?: React.FormEvent) {

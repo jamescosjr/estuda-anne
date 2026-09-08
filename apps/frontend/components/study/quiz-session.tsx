@@ -9,6 +9,7 @@ import { QuizCard } from './quiz-card'
 import { useAuth } from '@/lib/auth-context'
 import { getApiUrl } from '@/lib/api-config'
 import { fetchJson, shuffleInPlace } from '@/lib/http'
+import { resolveSubjectFilter, useStudentSubjects } from '@/lib/student-subjects'
 
 const SEEN_QUIZ_KEY = 'estuda-anne.quiz.seen-ids'
 
@@ -76,8 +77,6 @@ function mapApiQuestion(question: any, subject: string, isNew = false): QuizQues
   }
 }
 
-const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
-
 export function QuizSession() {
   const { user } = useAuth()
   const [questions, setQuestions] = useState<QuizQuestion[]>([])
@@ -91,14 +90,17 @@ export function QuizSession() {
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
 
   const userSubjectsKey = user?.subjects?.join(',') || ''
-  const availableSubjects = user?.subjects && user.subjects.length > 0
-    ? user.subjects
-    : DEFAULT_SUBJECTS
+  const availableSubjects = useStudentSubjects()
+
+  useEffect(() => {
+    setSubjectFilter((current) => resolveSubjectFilter(availableSubjects, current))
+  }, [userSubjectsKey])
 
   useEffect(() => {
     async function loadQuizzes() {
       setLoadError(null)
-      const studentId = user?.id || 'guest-student'
+      const studentId = user?.id
+      if (!studentId) return
       const topic = subjectFilter !== 'all' ? subjectFilter : undefined
       try {
         const params = new URLSearchParams({
@@ -138,6 +140,10 @@ export function QuizSession() {
   }, [userSubjectsKey, targetCount, subjectFilter, user?.id])
 
   async function handleStartExtraSession() {
+    if (!user?.id) {
+      setLoadError('Faça login para gerar a sessão extra.')
+      return
+    }
     setCurrent(0)
     setLoadError(null)
     setGenerating(true)
@@ -155,7 +161,7 @@ export function QuizSession() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: user?.id || 'guest-student',
+          studentId: user?.id,
           topic: subjectFilter !== 'all' ? subjectFilter : undefined,
           count: targetCount,
           excludeIds: [...readSeenQuizIds()],

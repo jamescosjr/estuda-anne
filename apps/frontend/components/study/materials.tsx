@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { UploadZone } from './upload-zone'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
+import { resolveSelectedSubject, useStudentSubjects } from '@/lib/student-subjects'
 
 function mapMaterialStatus(status?: string): UploadItem['status'] {
   if (status === 'READY' || status === 'PROCESSED' || status === 'DONE') return 'done'
@@ -100,17 +101,19 @@ function sleep(ms: number) {
 export function Materials() {
   const { user } = useAuth()
   const [uploads, setUploads] = useState<UploadItem[]>([])
-  const userSubjects = user?.subjects && user.subjects.length > 0
-    ? user.subjects
-    : ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
-  const [selectedSubject, setSelectedSubject] = useState<string>(userSubjects[0] || 'Geral')
+  const userSubjects = useStudentSubjects()
+  const [selectedSubject, setSelectedSubject] = useState<string>('')
   const bffUrl = getApiUrl()
 
-  const studentId = user?.id || 'guest-student'
-  const storageKey = `estuda_anne_materials_${studentId}`
+  const studentId = user?.id || ''
+  const storageKey = studentId ? `estuda_anne_materials_${studentId}` : ''
 
   useEffect(() => {
-    // Carrega materiais persistidos no localStorage do usuário
+    setSelectedSubject((current) => resolveSelectedSubject(userSubjects, current))
+  }, [userSubjects.join('|')])
+
+  useEffect(() => {
+    if (!storageKey) return
     try {
       const stored = localStorage.getItem(storageKey)
       if (stored) {
@@ -121,6 +124,7 @@ export function Materials() {
     }
 
     async function loadBackendMaterials() {
+      if (!studentId) return
       try {
         const res = await fetch(`${bffUrl}/api/materials?studentId=${encodeURIComponent(studentId)}`)
         if (res.ok) {
@@ -161,6 +165,7 @@ export function Materials() {
 
   async function handleFiles(files: File[]) {
     if (!files || files.length === 0) return
+    if (!studentId || !selectedSubject) return
 
     // 1. Cria itens iniciais com status 'processing' e adiciona IMEDIATAMENTE ao estado
     const newItems: UploadItem[] = files.map((file, i) => {

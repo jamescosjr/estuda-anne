@@ -19,11 +19,14 @@ interface UploadZoneProps {
   onFiles?: (files: File[]) => void
 }
 
-export function UploadZone({ subjects = [], selectedSubject = 'Geral', onSubjectChange, onFiles }: UploadZoneProps) {
+export function UploadZone({ subjects = [], selectedSubject = '', onSubjectChange, onFiles }: UploadZoneProps) {
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const hasSubjects = subjects.length > 0
+  const activeSubject = hasSubjects ? selectedSubject : ''
 
   function handleFiles(list: FileList | null) {
+    if (!hasSubjects || !activeSubject) return
     if (!list || list.length === 0) return
     onFiles?.(Array.from(list))
   }
@@ -37,18 +40,19 @@ export function UploadZone({ subjects = [], selectedSubject = 'Geral', onSubject
         </label>
         <select
           id="material-subject-select"
-          value={selectedSubject}
+          value={activeSubject}
+          disabled={!hasSubjects}
           onChange={(e) => onSubjectChange?.(e.target.value)}
-          className="h-8 flex-1 max-w-xs rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          className="h-8 flex-1 max-w-xs rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60"
         >
-          {subjects.length === 0 ? (
-            <option value="Geral">Geral / Sem Matéria</option>
-          ) : (
+          {hasSubjects ? (
             subjects.map((sub) => (
               <option key={sub} value={sub}>
                 {sub}
               </option>
             ))
+          ) : (
+            <option value="">Cadastre uma matéria no Perfil</option>
           )}
         </select>
       </div>
@@ -65,19 +69,22 @@ export function UploadZone({ subjects = [], selectedSubject = 'Geral', onSubject
           handleFiles(e.dataTransfer.files)
         }}
         role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
+        tabIndex={hasSubjects ? 0 : -1}
+        onClick={() => hasSubjects && inputRef.current?.click()}
         onKeyDown={(e) => {
+          if (!hasSubjects) return
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             inputRef.current?.click()
           }
         }}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-12 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
-          dragging
-            ? 'border-primary bg-primary/5'
-            : 'border-border bg-muted/40 hover:border-primary/50 hover:bg-muted/70',
+          'flex flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-12 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+          !hasSubjects
+            ? 'cursor-not-allowed border-border bg-muted/30 opacity-80'
+            : dragging
+              ? 'cursor-pointer border-primary bg-primary/5'
+              : 'cursor-pointer border-border bg-muted/40 hover:border-primary/50 hover:bg-muted/70',
         )}
       >
         <span
@@ -92,11 +99,20 @@ export function UploadZone({ subjects = [], selectedSubject = 'Geral', onSubject
           Arraste e solte seus arquivos ou fotos de provas aqui
         </p>
         <p className="mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
-          Ou clique para selecionar. A Anne associará o material à matéria <strong className="text-foreground">{selectedSubject}</strong> e gerará resumos e quizzes.
+          {hasSubjects ? (
+            <>
+              Ou clique para selecionar. A Anne associará o material à matéria{' '}
+              <strong className="text-foreground">{activeSubject}</strong> e gerará resumos e quizzes.
+            </>
+          ) : (
+            <>
+              Cadastre ou mantenha suas matérias em <strong className="text-foreground">Meu perfil</strong> antes de enviar arquivos.
+            </>
+          )}
         </p>
-        <Button className="mt-5" size="lg">
+        <Button className="mt-5" size="lg" disabled={!hasSubjects}>
           <FileUp />
-          Selecionar arquivos para {selectedSubject}
+          {hasSubjects ? `Selecionar arquivos para ${activeSubject}` : 'Sem matéria no perfil'}
         </Button>
         <input
           ref={inputRef}

@@ -10,8 +10,8 @@ import { Flashcard, type Difficulty } from './flashcard'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
 import { fetchJson } from '@/lib/http'
+import { resolveSubjectFilter, useStudentSubjects } from '@/lib/student-subjects'
 
-const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 const SEEN_CARDS_KEY = 'estuda-anne.flashcards.seen-ids'
 
 function isPlaceholderFront(front: string): boolean {
@@ -63,14 +63,13 @@ export function ReviewSession() {
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
   const bffUrl = getApiUrl()
 
-  const studentId = user?.id || 'guest-student'
+  const studentId = user?.id || ''
   const userSubjectsKey = user?.subjects?.join(',') || ''
-  const availableSubjects = user?.subjects && user.subjects.length > 0
-    ? user.subjects
-    : DEFAULT_SUBJECTS
+  const availableSubjects = useStudentSubjects()
 
   useEffect(() => {
     async function loadDueCards() {
+      if (!studentId) return
       setLoadError(null)
       try {
         const { ok, data } = await fetchJson<any[]>(
@@ -116,9 +115,17 @@ export function ReviewSession() {
     loadDueCards()
   }, [bffUrl, studentId, userSubjectsKey, targetCount, subjectFilter])
 
+  useEffect(() => {
+    setSubjectFilter((current) => resolveSubjectFilter(availableSubjects, current))
+  }, [userSubjectsKey])
+
   const [sessionId, setSessionId] = useState<number>(0)
 
   async function handleStartExtraSession() {
+    if (!studentId) {
+      setLoadError('Faça login para gerar a sessão extra.')
+      return
+    }
     setCurrent(0)
     setDone(false)
     setLoadError(null)
