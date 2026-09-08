@@ -55,37 +55,47 @@ export class PedagogicalCoordinatorAgent {
 
       const focusTopics = toFocusTopics(analysis.keyConcepts);
 
-      // 3. Etapa 2: Invocação do FlashcardSpecialistAgent (Cartões pedagógicos de retenção)
-      const flashcards = await this.flashcardAgent.generateFlashcards(
-        material.id,
-        material.studentId,
-        studyText,
-        analysis.keyConcepts,
-        focusTopics,
-        false,
-        cacheHandle
-      );
+      // 3. Loop Autônomo de Qualidade e Reajuste Pedagógico (até 3 tentativas)
+      let flashcards: any[] = [];
+      let quiz: any = null;
+      let qualityResult: any = { passed: false, score: 0, reason: '' };
+      const maxQualityRetries = 3;
 
-      // 4. Etapa 3: Invocação do QuizSpecialistAgent (Questões de avaliação)
-      const quiz = await this.quizAgent.generateQuiz(
-        material.id,
-        material.studentId,
-        material.title,
-        studyText,
-        focusTopics,
-        false,
-        cacheHandle
-      );
+      for (let attempt = 1; attempt <= maxQualityRetries; attempt++) {
+        flashcards = await this.flashcardAgent.generateFlashcards(
+          material.id,
+          material.studentId,
+          studyText,
+          analysis.keyConcepts,
+          focusTopics,
+          false,
+          cacheHandle
+        );
 
-      const qualityResult = this.qualityGateAgent.evaluateQuality(
-        analysis.summary,
-        analysis.keyConcepts,
-        flashcards,
-        quiz
-      );
+        quiz = await this.quizAgent.generateQuiz(
+          material.id,
+          material.studentId,
+          material.title,
+          studyText,
+          focusTopics,
+          false,
+          cacheHandle
+        );
+
+        qualityResult = this.qualityGateAgent.evaluateQuality(
+          analysis.summary,
+          analysis.keyConcepts,
+          flashcards,
+          quiz
+        );
+
+        if (qualityResult.passed) {
+          break;
+        }
+      }
 
       if (!qualityResult.passed) {
-        throw new Error(`Falha no controle de qualidade pedagógico: ${qualityResult.reason}`);
+        throw new Error(`Falha no controle de qualidade pedagógico após ${maxQualityRetries} tentativas: ${qualityResult.reason}`);
       }
 
       await this.flashcardAgent.persistFlashcards(flashcards);

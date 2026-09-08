@@ -449,8 +449,46 @@ export function QuizSession() {
     loadQuizzes()
   }, [userSubjectsKey, targetCount, subjectFilter, user?.id])
 
-  function handleStartExtraSession() {
+  async function handleStartExtraSession() {
     setCurrent(0)
+    setLoadError(null)
+
+    try {
+      const res = await fetch(`${getApiUrl()}/api/quizzes/extra-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: user?.id || 'guest-student',
+          topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        const newQuiz = data.quiz
+        if (newQuiz && Array.isArray(newQuiz.questions) && newQuiz.questions.length > 0) {
+          const mapped: QuizQuestion[] = newQuiz.questions.map((q: any, idx: number) => ({
+            id: q.id || `${newQuiz.id}-${idx}`,
+            subject: newQuiz.title || 'Quiz Extra',
+            prompt: q.prompt,
+            options: (q.options || []).map((text: string, optionIdx: number) => ({
+              id: String(optionIdx),
+              text,
+            })),
+            correctId: String(q.correctAnswerIndex ?? 0),
+            explanation: q.explanation || '',
+          })).map(randomizeQuestionOptions)
+
+          setQuestionPool(mapped)
+          setQuestions(mapped.slice(0, targetCount))
+          setUsingDemo(false)
+          return
+        }
+      }
+    } catch {
+      // Ignora erro e cai no fallback
+    }
+
     if (questionPool.length > 0) {
       setUsingDemo(false)
       const picked = pickUnseenQuestions(questionPool, targetCount)

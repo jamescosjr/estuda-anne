@@ -193,11 +193,42 @@ export function ReviewSession() {
 
   const [sessionId, setSessionId] = useState<number>(0)
 
-  function handleStartExtraSession() {
+  async function handleStartExtraSession() {
     setCurrent(0)
     setDone(false)
     setLoadError(null)
     setSessionId((s) => s + 1)
+
+    try {
+      const res = await fetch(`${bffUrl}/api/flashcards/extra-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        const newFlashcards = data.flashcards || []
+        if (Array.isArray(newFlashcards) && newFlashcards.length > 0) {
+          const mapped: FlashcardItem[] = newFlashcards.map((fc: any) => ({
+            id: fc.id,
+            subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
+            front: fc.front,
+            back: fc.back,
+            persisted: true,
+          }))
+          setPersistedPool(mapped)
+          setCards(mapped.slice(0, targetCount))
+          setUsingDemo(false)
+          return
+        }
+      }
+    } catch {
+      // Ignora erro e recorre ao fallback local
+    }
 
     if (persistedPool.length > 0) {
       setUsingDemo(false)
@@ -267,7 +298,7 @@ export function ReviewSession() {
               Revisão concluída!
             </h2>
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground text-pretty">
-              Você revisou {total} flashcards. A Anne reagendou cada card conforme sua dificuldade e
+              Você revisou {total} flashcards. O assistente de IA reagendou cada card conforme sua dificuldade e
               atualizou seu progresso no cronograma.
             </p>
             <Button onClick={restart} variant="secondary">

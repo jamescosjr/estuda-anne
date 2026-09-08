@@ -5,6 +5,7 @@ Este documento define as personas, responsabilidades e o fluxo de governança da
 ## Regras Fundamentais de Governança e Ferramentas
 > 1. **Prestação de Contas**: Todos os agentes devem se reportar ao Coordinator antes de tomar decisões arquiteturais, mudanças de escopo ou ações irreversíveis.
 > 2. **Documentação Atualizada via Context7 MCP**: Todos os agentes de engenharia, arquitetura e qualidade devem utilizar o **Context7 MCP** para consultar a documentação mais recente e orientada a versão de pacotes e frameworks (ex: React, Next.js, Vitest, Playwright, Mongoose, Gemini SDK, Tailwind), prevenindo alucinações e APIs obsoletas.
+> 3. **Auto-Ajuste e Realimentação Autônoma pós-Erros (Self-Correction & Agent Alignment)**: Sempre que for detectado um erro de qualidade (ex: repetições, vazamento de persona, falha em testes ou em chamadas de IA), a equipe de agentes (desenvolvimento e tempo de execução) DEVE implementar um circuito autônomo de realimentação e retry com instrução corretiva para ajustar prompts, sanitizadores e validações, garantindo que o erro não volte a acontecer.
 
 ---
 

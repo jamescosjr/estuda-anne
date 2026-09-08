@@ -121,7 +121,7 @@ export function QuizCard({ question, index, total, onNext, isLast }: QuizCardPro
                 {isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}
               </p>
               <p className="mt-2 text-sm leading-relaxed text-foreground/80 text-pretty">
-                <span className="font-medium text-foreground">Explicação da Anne: </span>
+                <span className="font-medium text-foreground">Explicação do Assistente: </span>
                 {question.explanation}
               </p>
             </div>

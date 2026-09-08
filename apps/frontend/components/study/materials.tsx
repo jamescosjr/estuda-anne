@@ -317,7 +317,7 @@ export function Materials() {
               </span>
               <h3 className="font-semibold text-foreground text-sm">Nenhum material enviado ainda</h3>
               <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                Envie suas apostilas (PDF), apresentações (PPTX) ou gravações de aulas (MP3/MP4) na zona acima. A Anne gerará quizzes e flashcards automaticamente para você!
+                Envie suas apostilas (PDF), apresentações (PPTX) ou gravações de aulas (MP3/MP4) na zona acima. O assistente pedagógico gerará quizzes e flashcards automaticamente para você!
               </p>
             </div>
           ) : (
