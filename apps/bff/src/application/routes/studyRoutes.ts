@@ -247,6 +247,7 @@ export async function studyRoutes(app: FastifyInstance) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
+        signal: AbortSignal.timeout(180_000),
       });
 
       if (!res.ok) {
@@ -663,6 +664,7 @@ REGRAS RÍGIDAS:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
+        signal: AbortSignal.timeout(180_000),
       });
 
       if (!res.ok) {

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p ${PORT:-9000}",
     "build": "next build",
-    "start": "next start -p ${PORT:-9000}",
+    "start": "next start -p ${PORT:-9000} --keepAliveTimeout 180000",
     "lint": "next lint"
   },
   "dependencies": {
