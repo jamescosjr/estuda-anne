@@ -228,6 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error: 'Não foi possível conectar ao servidor para salvar o perfil.',
       }
     }
+  }
 
   function loginAsDemo(role: 'ADMIN' | 'STUDENT') {
     if (role === 'ADMIN') {
