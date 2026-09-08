@@ -1,18 +1,13 @@
 import { FastifyReply, FastifyRequest } from 'fastify';
-import { z } from 'zod';
 import {
   ReviewFlashcardBodySchema,
   ReviewFlashcardParamsSchema,
   GetDueFlashcardsQuerySchema,
+  ExtraSessionBodySchema,
 } from '../dto/flashcard.dto.js';
 import { ReviewFlashcardUseCase } from '../../domain/usecases/ReviewFlashcardUseCase.js';
 import { GetDueFlashcardsUseCase } from '../../domain/usecases/GetDueFlashcardsUseCase.js';
 import { GenerateExtraSessionUseCase } from '../../domain/usecases/GenerateExtraSessionUseCase.js';
-
-const ExtraSessionBodySchema = z.object({
-  studentId: z.string().min(1),
-  materialId: z.string().optional(),
-});
 
 export class FlashcardController {
   constructor(
@@ -53,13 +48,19 @@ export class FlashcardController {
     const result = await this.extraSessionUseCase.execute({
       studentId: body.studentId,
       materialId: body.materialId,
+      topic: body.topic || body.subjectId,
+      count: body.count,
+      excludeIds: body.excludeIds,
       targetType: 'flashcards',
     });
 
     reply.status(201).send({
       message: 'Sessão extra de flashcards gerada e persistida com sucesso!',
       generatedCount: result.generatedFlashcardsCount,
+      mixedDueCount: result.mixedDueCount,
       weakTopics: result.weakTopics,
+      adaptiveHint: result.adaptiveHint,
+      newCardIds: result.newCardIds,
       flashcards: result.flashcards.map((f) => f.toJSON()),
     });
   }

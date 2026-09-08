@@ -69,7 +69,8 @@ export class PedagogicalCoordinatorAgent {
           analysis.keyConcepts,
           focusTopics,
           false,
-          cacheHandle
+          cacheHandle,
+          8
         );
 
         quiz = await this.quizAgent.generateQuiz(

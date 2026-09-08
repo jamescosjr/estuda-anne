@@ -341,7 +341,7 @@ ${content.slice(0, 10000)}`;
         const triggerFn = triggers[i % triggers.length];
         const front = triggerFn(topic);
 
-        if (isDuplicateOrHighlySimilar(front, seenFronts, 0.50)) continue;
+        if (isDuplicateOrHighlySimilar(front, seenFronts, 0.78)) continue;
 
         seenFronts.push(front);
         cards.push({

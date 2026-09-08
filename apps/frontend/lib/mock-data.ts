@@ -47,6 +47,7 @@ export interface QuizQuestion {
   options: { id: string; text: string }[]
   correctId: string
   explanation: string
+  isNew?: boolean
 }
 
 export interface FlashcardItem {
@@ -55,6 +56,7 @@ export interface FlashcardItem {
   front: string
   back: string
   persisted?: boolean
+  isNew?: boolean
 }
 
 export const courseProgress: CourseProgress[] = [

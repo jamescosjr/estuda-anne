@@ -37,11 +37,13 @@ export function QuizCard({ question, index, total, onNext, isLast }: QuizCardPro
   return (
     <Card>
       <CardContent className="p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <Badge variant="default">
-            <Sparkles className="size-3.5" />
-            Questão gerada por IA
-          </Badge>
+          <div className="mb-5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <Badge variant="default">
+                <Sparkles className="size-3.5" />
+                {question.isNew ? 'Questão nova persistida' : 'Do acervo'}
+              </Badge>
+            </div>
           <span className="text-sm font-medium text-muted-foreground">
             {index + 1} de {total}
           </span>

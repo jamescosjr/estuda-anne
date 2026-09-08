@@ -6,6 +6,7 @@ import {
   isDuplicateOrHighlySimilar,
   isPedagogicallyOffTopic,
 } from '../StudyCorpusSanitizer.js';
+import { GENERATION_SIMILARITY_THRESHOLD } from '../FlashcardStudySession.js';
 
 export class QuizSpecialistAgent {
   constructor(
@@ -20,7 +21,8 @@ export class QuizSpecialistAgent {
     rawText: string,
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
     persist = true,
-    cacheHandle?: ContextCacheHandle | null
+    cacheHandle?: ContextCacheHandle | null,
+    count = 4
   ): Promise<Quiz | null> {
     const existingMaterialQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
     const studentQuizzes = (await this.quizRepository.findByStudentId?.(studentId)) || [];
@@ -33,7 +35,7 @@ export class QuizSpecialistAgent {
 
     let quizQuestions = await this.aiService.generateQuizQuestions(
       rawText,
-      4,
+      Math.max(3, count),
       existingPrompts,
       focusTopics,
       { cacheHandle }
@@ -46,7 +48,7 @@ export class QuizSpecialistAgent {
       if (!q || !q.prompt) return false;
       if (isDocumentMetaReferencing(q.prompt)) return false;
       if (isPedagogicallyOffTopic(q.prompt)) return false;
-      if (isDuplicateOrHighlySimilar(q.prompt, accumulatedPrompts, 0.50)) return false;
+      if (isDuplicateOrHighlySimilar(q.prompt, accumulatedPrompts, GENERATION_SIMILARITY_THRESHOLD)) return false;
 
       accumulatedPrompts.push(q.prompt.trim());
       return true;

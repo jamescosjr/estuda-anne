@@ -2,6 +2,7 @@ import { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { EvaluateQuizUseCase } from '../../domain/usecases/EvaluateQuizUseCase.js';
 import { GenerateExtraSessionUseCase } from '../../domain/usecases/GenerateExtraSessionUseCase.js';
+import { GetQuizSessionUseCase } from '../../domain/usecases/GetQuizSessionUseCase.js';
 import { IQuizRepository } from '../../domain/ports/IQuizRepository.js';
 
 const EvaluateQuizBodySchema = z.object({
@@ -20,13 +21,24 @@ const EvaluateQuizParamsSchema = z.object({
 const ExtraSessionBodySchema = z.object({
   studentId: z.string().min(1),
   materialId: z.string().optional(),
+  topic: z.string().optional(),
+  subjectId: z.string().optional(),
+  count: z.coerce.number().int().min(3).max(20).optional(),
+  excludeIds: z.array(z.string()).optional(),
+});
+
+const QuizSessionQuerySchema = z.object({
+  studentId: z.string().min(1),
+  topic: z.string().optional(),
+  count: z.coerce.number().int().min(3).max(20).optional(),
 });
 
 export class QuizController {
   constructor(
     private readonly evaluateQuizUseCase: EvaluateQuizUseCase,
     private readonly quizRepository?: IQuizRepository,
-    private readonly extraSessionUseCase?: GenerateExtraSessionUseCase
+    private readonly extraSessionUseCase?: GenerateExtraSessionUseCase,
+    private readonly getQuizSessionUseCase?: GetQuizSessionUseCase
   ) {}
 
   public async listByStudent(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -37,6 +49,22 @@ export class QuizController {
     }
     const quizzes = await this.quizRepository.findByStudentId(query.studentId);
     reply.status(200).send(quizzes.map((quiz) => quiz.toJSON()));
+  }
+
+  public async getSession(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const query = QuizSessionQuerySchema.parse(request.query);
+    if (!this.getQuizSessionUseCase) {
+      reply.status(501).send({ message: 'GetQuizSessionUseCase indisponível' });
+      return;
+    }
+
+    const result = await this.getQuizSessionUseCase.execute({
+      studentId: query.studentId,
+      topic: query.topic,
+      count: query.count,
+    });
+
+    reply.status(200).send(result);
   }
 
   public async evaluate(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -60,12 +88,20 @@ export class QuizController {
     const result = await this.extraSessionUseCase.execute({
       studentId: body.studentId,
       materialId: body.materialId,
+      topic: body.topic || body.subjectId,
+      count: body.count,
+      excludeIds: body.excludeIds,
       targetType: 'quiz',
     });
 
     reply.status(201).send({
-      message: 'Sessão extra de quiz gerada e persistida com sucesso!',
+      message: 'Sessão extra de quiz gerada, persistida e misturada com o acervo.',
       weakTopics: result.weakTopics,
+      adaptiveHint: result.adaptiveHint,
+      generatedCount: result.newQuestionIds.length,
+      mixedBankCount: result.mixedBankCount,
+      newQuestionIds: result.newQuestionIds,
+      questions: result.sessionQuestions,
       quiz: result.quiz ? result.quiz.toJSON() : null,
     });
   }

@@ -37,4 +37,11 @@ export const GetDueFlashcardsQuerySchema = z.object({
   limit: z.coerce.number().positive().max(100).optional().default(50),
 });
 
-export type GetDueFlashcardsQueryDTO = z.infer<typeof GetDueFlashcardsQuerySchema>;
+export const ExtraSessionBodySchema = z.object({
+  studentId: z.string().min(1),
+  materialId: z.string().optional(),
+  topic: z.string().optional(),
+  subjectId: z.string().optional(),
+  count: z.coerce.number().int().min(3).max(20).optional(),
+  excludeIds: z.array(z.string()).optional(),
+});

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CheckCircle2, RotateCcw, Layers, Sparkles, BookOpen } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Sparkles, BookOpen, Loader2 } from 'lucide-react'
 import { type FlashcardItem } from '@/lib/mock-data'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Flashcard, type Difficulty } from './flashcard'
 import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
-import { fetchJson, shuffleInPlace } from '@/lib/http'
+import { fetchJson } from '@/lib/http'
 
 const academicFlashcardTemplates: Record<string, { front: string; back: string }[]> = {
   'cálculo': [
@@ -134,6 +134,35 @@ function generateAcademicFlashcards(subjects: string[], targetCount = 5, subject
 }
 
 const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
+const SEEN_CARDS_KEY = 'estuda-anne.flashcards.seen-ids'
+
+function readSeenCardIds(): string[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = window.sessionStorage.getItem(SEEN_CARDS_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function rememberSeenCardIds(ids: string[]) {
+  if (typeof window === 'undefined') return
+  const next = Array.from(new Set([...readSeenCardIds(), ...ids])).slice(-80)
+  window.sessionStorage.setItem(SEEN_CARDS_KEY, JSON.stringify(next))
+}
+
+function mapApiCard(fc: any, isNew = false): FlashcardItem {
+  return {
+    id: fc.id,
+    subject: fc.subject || fc.topic || fc.tags?.[0] || 'Conceito',
+    front: fc.front,
+    back: fc.back,
+    persisted: Boolean(fc.id && !String(fc.id).startsWith('fc-')),
+    isNew,
+  }
+}
 
 export function ReviewSession() {
   const { user } = useAuth()
@@ -141,6 +170,9 @@ export function ReviewSession() {
   const [persistedPool, setPersistedPool] = useState<FlashcardItem[]>([])
   const [usingDemo, setUsingDemo] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [adaptiveHint, setAdaptiveHint] = useState<string | null>(null)
+  const [sessionMeta, setSessionMeta] = useState<{ generated: number; mixed: number } | null>(null)
   const [current, setCurrent] = useState(0)
   const [done, setDone] = useState(false)
   const [targetCount, setTargetCount] = useState<number>(5)
@@ -161,19 +193,21 @@ export function ReviewSession() {
           `${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`,
         )
         if (ok && Array.isArray(data) && data.length > 0) {
-          const mapped: FlashcardItem[] = data.map((fc: any) => {
-            const isRealId = Boolean(fc.id && !fc.id.startsWith('fc-gen-') && !fc.id.startsWith('fc-'))
-            return {
-              id: fc.id,
-              subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
-              front: fc.front,
-              back: fc.back,
-              persisted: isRealId,
-            }
-          })
+          const seen = new Set(readSeenCardIds())
+          const mapped: FlashcardItem[] = data.map((fc: any) => mapApiCard(fc, false))
+          const unseen = mapped.filter((card) => !seen.has(card.id))
+          const rest = mapped.filter((card) => seen.has(card.id))
+          const ordered = [...unseen, ...rest]
+          const filtered = subjectFilter === 'all'
+            ? ordered
+            : ordered.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
+          const pool = filtered.length > 0 ? filtered : ordered
           setPersistedPool(mapped)
-          setCards(mapped.slice(0, targetCount))
+          setCards(pool.slice(0, targetCount))
+          rememberSeenCardIds(pool.slice(0, targetCount).map((card) => card.id))
           setUsingDemo(false)
+          setAdaptiveHint(null)
+          setSessionMeta(null)
           return
         }
         if (!ok) {
@@ -197,55 +231,55 @@ export function ReviewSession() {
     setCurrent(0)
     setDone(false)
     setLoadError(null)
+    setGenerating(true)
     setSessionId((s) => s + 1)
 
     try {
-      const res = await fetch(`${bffUrl}/api/flashcards/extra-session`, {
+      const { ok, data } = await fetchJson<{
+        flashcards?: any[]
+        generatedCount?: number
+        mixedDueCount?: number
+        weakTopics?: string[]
+        adaptiveHint?: string
+        newCardIds?: string[]
+        message?: string
+      }>(`${bffUrl}/api/flashcards/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId,
           topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+          count: targetCount,
+          excludeIds: readSeenCardIds(),
         }),
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        const newFlashcards = data.flashcards || []
-        if (Array.isArray(newFlashcards) && newFlashcards.length > 0) {
-          const mapped: FlashcardItem[] = newFlashcards.map((fc: any) => ({
-            id: fc.id,
-            subject: fc.topic || fc.tags?.[0] || 'Conceito Geral',
-            front: fc.front,
-            back: fc.back,
-            persisted: true,
-          }))
-          setPersistedPool(mapped)
-          setCards(mapped.slice(0, targetCount))
-          setUsingDemo(false)
-          return
-        }
+      const newFlashcards = data?.flashcards || []
+      if (ok && Array.isArray(newFlashcards) && newFlashcards.length > 0) {
+        const newIds = new Set(data?.newCardIds || [])
+        const mapped: FlashcardItem[] = newFlashcards.map((fc: any) => mapApiCard(fc, newIds.has(fc.id)))
+        setPersistedPool((prev) => {
+          const byId = new Map(prev.map((card) => [card.id, card]))
+          mapped.forEach((card) => byId.set(card.id, card))
+          return [...byId.values()]
+        })
+        setCards(mapped)
+        setUsingDemo(false)
+        setAdaptiveHint(data?.adaptiveHint || null)
+        setSessionMeta({
+          generated: data?.generatedCount ?? mapped.filter((c) => c.isNew).length,
+          mixed: data?.mixedDueCount ?? 0,
+        })
+        rememberSeenCardIds(mapped.map((card) => card.id))
+        return
       }
+
+      setLoadError(data?.message || 'Não foi possível gerar um lote novo agora. Tente novamente.')
     } catch {
-      // Ignora erro e recorre ao fallback local
+      setLoadError('Falha ao gerar a sessão extra. Verifique a conexão e tente de novo.')
+    } finally {
+      setGenerating(false)
     }
-
-    if (persistedPool.length > 0) {
-      setUsingDemo(false)
-      const filtered = subjectFilter === 'all'
-        ? persistedPool
-        : persistedPool.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
-      const poolToUse = filtered.length > 0 ? filtered : persistedPool
-      const cloned = [...poolToUse]
-      const shuffled = shuffleInPlace(cloned)
-      setCards(shuffled.slice(0, Math.min(targetCount, shuffled.length)))
-      return
-    }
-
-    setUsingDemo(true)
-    const extraCards = generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter)
-    const clonedExtra = [...extraCards]
-    setCards(shuffleInPlace(clonedExtra))
   }
 
   async function handleGrade(difficulty: Difficulty) {
@@ -319,8 +353,8 @@ export function ReviewSession() {
           <div className="flex items-center gap-2">
             <Sparkles className="size-5 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-foreground">Flashcards Extra — Fora do Horário</p>
-              <p className="text-xs text-muted-foreground">Escolha a quantidade de cartões e a matéria para praticar</p>
+              <p className="text-sm font-semibold text-foreground">Sessão extra adaptativa</p>
+              <p className="text-xs text-muted-foreground">Gera cards novos, persiste no banco e mistura com a fila SM-2 da matéria</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -349,14 +383,28 @@ export function ReviewSession() {
             <button
               type="button"
               onClick={handleStartExtraSession}
-              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+              disabled={generating}
+              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-60"
             >
-              <BookOpen className="size-3.5" />
-              Gerar Sessão Extra
+              {generating ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
+              {generating ? 'Gerando lote...' : 'Gerar Sessão Extra'}
             </button>
           </div>
         </CardContent>
       </Card>
+
+      {sessionMeta && !usingDemo && (
+        <p className="text-xs text-muted-foreground">
+          Lote ativo: {sessionMeta.generated} card(s) novos persistidos
+          {sessionMeta.mixed > 0 ? ` misturados com ${sessionMeta.mixed} da revisão espaçada` : ''}.
+        </p>
+      )}
+
+      {adaptiveHint && !usingDemo && (
+        <p className="text-xs text-foreground/80 rounded-lg border border-border bg-muted/40 px-3 py-2">
+          {adaptiveHint}
+        </p>
+      )}
 
       {loadError && (
         <p className="text-xs text-destructive">{loadError}</p>

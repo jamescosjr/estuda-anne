@@ -32,11 +32,14 @@ export function Flashcard({ card, onGrade }: FlashcardProps) {
           revealed && 'bg-gradient-to-b from-card to-muted/40',
         )}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium uppercase tracking-wide text-primary">
             {card.subject}
           </p>
-          <Badge variant="neutral">{revealed ? 'Resposta' : 'Pergunta'}</Badge>
+          <div className="flex items-center gap-1.5">
+            {card.isNew && <Badge>Novo</Badge>}
+            <Badge variant="neutral">{revealed ? 'Resposta' : 'Pergunta'}</Badge>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">

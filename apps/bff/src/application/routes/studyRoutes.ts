@@ -240,13 +240,13 @@ export async function studyRoutes(app: FastifyInstance) {
 
   // Rota para Gerar Sessão Extra de Flashcards (reavalia perfil e gera novos flashcards persistidos)
   app.post('/api/flashcards/extra-session', async (request, reply) => {
-    const { studentId = 'anne-student-1', subjectId, topic } = (request.body as any) || {};
+    const { studentId = 'anne-student-1', subjectId, topic, count, excludeIds } = (request.body as any) || {};
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, topic }),
+        body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
       });
 
       if (!res.ok) {
@@ -590,6 +590,26 @@ REGRAS RÍGIDAS:
     reply.raw.end();
   });
 
+  app.get('/api/quizzes/session', async (request, reply) => {
+    const { studentId = 'anne-student-1', topic, count } = request.query as any;
+    try {
+      const params = new URLSearchParams({ studentId: String(studentId) });
+      if (topic) params.set('topic', String(topic));
+      if (count) params.set('count', String(count));
+      const res = await fetch(`${STUDY_ENGINE_URL}/quizzes/session?${params.toString()}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao montar sessão de quiz' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(503).send({
+        error: 'StudyEngineUnavailable',
+        message: 'Falha ao montar sessão de quiz',
+      });
+    }
+  });
+
   app.get('/api/quizzes', async (request, reply) => {
     const { studentId = 'anne-student-1' } = request.query as any;
     try {
@@ -636,13 +656,13 @@ REGRAS RÍGIDAS:
 
   // Rota para Gerar Sessão Extra de Quizzes (reavalia perfil e gera novas questões direcionadas)
   app.post('/api/quizzes/extra-session', async (request, reply) => {
-    const { studentId = 'anne-student-1', subjectId, topic } = (request.body as any) || {};
+    const { studentId = 'anne-student-1', subjectId, topic, count, excludeIds } = (request.body as any) || {};
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/quizzes/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, topic }),
+        body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
       });
 
       if (!res.ok) {

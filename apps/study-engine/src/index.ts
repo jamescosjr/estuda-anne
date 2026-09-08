@@ -20,6 +20,7 @@ import { CompleteScheduleItemUseCase } from './domain/usecases/CompleteScheduleI
 import { DeleteMaterialUseCase } from './domain/usecases/DeleteMaterialUseCase.js';
 import { CloseSemesterUseCase } from './domain/usecases/CloseSemesterUseCase.js';
 import { EvaluateQuizUseCase } from './domain/usecases/EvaluateQuizUseCase.js';
+import { GetQuizSessionUseCase } from './domain/usecases/GetQuizSessionUseCase.js';
 import { SubmitAIFeedbackUseCase } from './domain/usecases/SubmitAIFeedbackUseCase.js';
 import { GenerateExtraSessionUseCase } from './domain/usecases/GenerateExtraSessionUseCase.js';
 import { MongoStudentAdaptiveProfileRepository } from './infrastructure/persistence/mongo/repositories/MongoStudentAdaptiveProfileRepository.js';
@@ -151,7 +152,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       vectorRepo,
       contentExtractor
     );
-    const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo);
+    const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo, profileRepo);
     const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo);
     const generateScheduleUseCase = new GenerateStudyScheduleUseCase(
       scheduleRepo,
@@ -176,6 +177,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
     );
     const analyzeScheduleFileUseCase = new AnalyzeScheduleFileUseCase(geminiAdapter);
     const evaluateQuizUseCase = new EvaluateQuizUseCase(quizRepo, profileRepo);
+    const getQuizSessionUseCase = new GetQuizSessionUseCase(quizRepo, profileRepo);
     const generateExtraSessionUseCase = new GenerateExtraSessionUseCase(
       materialRepo,
       flashcardRepo,
@@ -215,7 +217,8 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
     const quizController = new QuizController(
       evaluateQuizUseCase,
       quizRepo,
-      generateExtraSessionUseCase
+      generateExtraSessionUseCase,
+      getQuizSessionUseCase
     );
     const semesterController = new SemesterController(closeSemesterUseCase);
     const feedbackController = new AIFeedbackController(submitAIFeedbackUseCase, feedbackRepo);

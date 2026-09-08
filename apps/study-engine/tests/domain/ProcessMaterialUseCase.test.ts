@@ -330,7 +330,7 @@ describe('ProcessMaterialUseCase', () => {
     );
     expect(aiService.generateFlashcards).toHaveBeenCalledWith(
       expect.any(String),
-      5,
+      8,
       [],
       expect.any(Array),
       { cacheHandle: mockCacheHandle, keyConcepts: ['incerteza', 'heisenberg'] }

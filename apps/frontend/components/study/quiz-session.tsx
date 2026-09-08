@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { HelpCircle, Sparkles, BookOpen } from 'lucide-react'
+import { HelpCircle, Sparkles, BookOpen, Loader2 } from 'lucide-react'
 import { type QuizQuestion } from '@/lib/mock-data'
 import { Progress } from '@/components/ui/progress'
 import { Card, CardContent } from '@/components/ui/card'
@@ -386,6 +386,21 @@ function randomizeQuestionOptions(q: QuizQuestion): QuizQuestion {
   };
 }
 
+function mapApiQuestion(question: any, subject: string, isNew = false): QuizQuestion {
+  return {
+    id: question.id,
+    subject: question.subject || subject || 'Quiz',
+    prompt: question.prompt,
+    options: (question.options || []).map((text: string, optionIdx: number) => ({
+      id: String(optionIdx),
+      text,
+    })),
+    correctId: String(question.correctAnswerIndex ?? 0),
+    explanation: question.explanation || '',
+    isNew,
+  }
+}
+
 const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 
 export function QuizSession() {
@@ -394,6 +409,9 @@ export function QuizSession() {
   const [questionPool, setQuestionPool] = useState<QuizQuestion[]>([])
   const [usingDemo, setUsingDemo] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [adaptiveHint, setAdaptiveHint] = useState<string | null>(null)
+  const [sessionMeta, setSessionMeta] = useState<{ generated: number; mixed: number } | null>(null)
   const [current, setCurrent] = useState(0)
   const [targetCount, setTargetCount] = useState<number>(5)
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
@@ -406,42 +424,41 @@ export function QuizSession() {
   useEffect(() => {
     async function loadQuizzes() {
       setLoadError(null)
+      const studentId = user?.id || 'guest-student'
+      const topic = subjectFilter !== 'all' ? subjectFilter : undefined
       try {
-        const { ok, data } = await fetchJson<any[]>(
-          `${getApiUrl()}/api/quizzes?studentId=${encodeURIComponent(user?.id || 'guest-student')}`,
-        )
-        if (ok && Array.isArray(data) && data.length > 0) {
-          const mapped: QuizQuestion[] = data.flatMap((quiz: any) =>
-            (quiz.questions || []).map((question: any, idx: number) => ({
-              id: question.id || `${quiz.id}-${idx}`,
-              subject: quiz.title || 'Quiz',
-              prompt: question.prompt,
-              options: (question.options || []).map((text: string, optionIdx: number) => ({
-                id: String(optionIdx),
-                text,
-              })),
-              correctId: String(question.correctAnswerIndex ?? 0),
-              explanation: question.explanation || '',
-            })),
-          ).map(randomizeQuestionOptions)
+        const params = new URLSearchParams({
+          studentId,
+          count: String(targetCount),
+        })
+        if (topic) params.set('topic', topic)
+        const { ok, data } = await fetchJson<{
+          questions?: any[]
+          adaptiveHint?: string
+          bankCount?: number
+        }>(`${getApiUrl()}/api/quizzes/session?${params.toString()}`)
 
-          if (mapped.length > 0) {
-            const shuffled = pickUnseenQuestions(mapped, targetCount)
-            setUsingDemo(false)
-            setQuestionPool(mapped)
-            setQuestions(shuffled)
-            setCurrent(0)
-            return
-          }
+        if (ok && Array.isArray(data?.questions) && data.questions.length > 0) {
+          const mapped = data.questions.map((question) => mapApiQuestion(question, question.subject, false))
+          setUsingDemo(false)
+          setQuestionPool(mapped)
+          setQuestions(mapped.map(randomizeQuestionOptions))
+          setAdaptiveHint(data.adaptiveHint || null)
+          setSessionMeta({ generated: 0, mixed: data.bankCount ?? mapped.length })
+          setCurrent(0)
+          rememberSeenQuizIds(mapped.map((q) => q.id))
+          return
         }
         if (!ok) {
-          setLoadError('Não foi possível carregar os quizzes agora. Tente de novo em instantes.')
+          setLoadError('Não foi possível montar o quiz agora. Tente de novo em instantes.')
         }
       } catch {
-        setLoadError('Não foi possível carregar os quizzes agora. Tente de novo em instantes.')
+        setLoadError('Não foi possível montar o quiz agora. Tente de novo em instantes.')
       }
       setUsingDemo(true)
       setQuestionPool([])
+      setAdaptiveHint(null)
+      setSessionMeta(null)
       const rawAcademic = generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter)
       setQuestions(rawAcademic.map(randomizeQuestionOptions))
       setCurrent(0)
@@ -452,52 +469,52 @@ export function QuizSession() {
   async function handleStartExtraSession() {
     setCurrent(0)
     setLoadError(null)
+    setGenerating(true)
 
     try {
-      const res = await fetch(`${getApiUrl()}/api/quizzes/extra-session`, {
+      const { ok, data } = await fetchJson<{
+        questions?: any[]
+        quiz?: any
+        newQuestionIds?: string[]
+        generatedCount?: number
+        mixedBankCount?: number
+        adaptiveHint?: string
+        message?: string
+      }>(`${getApiUrl()}/api/quizzes/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           studentId: user?.id || 'guest-student',
           topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+          count: targetCount,
+          excludeIds: [...readSeenQuizIds()],
         }),
       })
 
-      if (res.ok) {
-        const data = await res.json()
-        const newQuiz = data.quiz
-        if (newQuiz && Array.isArray(newQuiz.questions) && newQuiz.questions.length > 0) {
-          const mapped: QuizQuestion[] = newQuiz.questions.map((q: any, idx: number) => ({
-            id: q.id || `${newQuiz.id}-${idx}`,
-            subject: newQuiz.title || 'Quiz Extra',
-            prompt: q.prompt,
-            options: (q.options || []).map((text: string, optionIdx: number) => ({
-              id: String(optionIdx),
-              text,
-            })),
-            correctId: String(q.correctAnswerIndex ?? 0),
-            explanation: q.explanation || '',
-          })).map(randomizeQuestionOptions)
-
-          setQuestionPool(mapped)
-          setQuestions(mapped.slice(0, targetCount))
-          setUsingDemo(false)
-          return
-        }
+      const payloadQuestions = data?.questions?.length ? data.questions : data?.quiz?.questions
+      if (ok && Array.isArray(payloadQuestions) && payloadQuestions.length > 0) {
+        const newIds = new Set(data?.newQuestionIds || [])
+        const mapped = payloadQuestions.map((q: any) =>
+          mapApiQuestion(q, q.subject || data?.quiz?.title || 'Quiz Extra', newIds.has(q.id)),
+        )
+        setQuestionPool(mapped)
+        setQuestions(mapped.map(randomizeQuestionOptions))
+        setUsingDemo(false)
+        setAdaptiveHint(data?.adaptiveHint || null)
+        setSessionMeta({
+          generated: data?.generatedCount ?? mapped.filter((q) => q.isNew).length,
+          mixed: data?.mixedBankCount ?? 0,
+        })
+        rememberSeenQuizIds(mapped.map((q) => q.id))
+        return
       }
-    } catch {
-      // Ignora erro e cai no fallback
-    }
 
-    if (questionPool.length > 0) {
-      setUsingDemo(false)
-      const picked = pickUnseenQuestions(questionPool, targetCount)
-      setQuestions(picked.map(randomizeQuestionOptions))
-      return
+      setLoadError(data?.message || 'Não foi possível gerar um lote novo agora. Tente novamente.')
+    } catch {
+      setLoadError('Falha ao gerar a sessão extra. Verifique a conexão e tente de novo.')
+    } finally {
+      setGenerating(false)
     }
-    setUsingDemo(true)
-    const rawAcademic = generateAcademicQuizzes(availableSubjects, targetCount, subjectFilter)
-    setQuestions(rawAcademic.map(randomizeQuestionOptions))
   }
 
   const total = questions.length
@@ -511,8 +528,8 @@ export function QuizSession() {
           <div className="flex items-center gap-2">
             <Sparkles className="size-5 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-foreground">Estudo Extra — Fora do Horário</p>
-              <p className="text-xs text-muted-foreground">Escolha a quantidade de questões e matéria para treinar livremente</p>
+              <p className="text-sm font-semibold text-foreground">Sessão extra adaptativa</p>
+              <p className="text-xs text-muted-foreground">Lê o acervo no banco, prioriza tópicos fracos e só gera o que faltar</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -541,14 +558,28 @@ export function QuizSession() {
             <button
               type="button"
               onClick={handleStartExtraSession}
-              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5"
+              disabled={generating}
+              className="h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors flex items-center gap-1.5 disabled:opacity-60"
             >
-              <BookOpen className="size-3.5" />
-              Gerar Sessão Extra
+              {generating ? <Loader2 className="size-3.5 animate-spin" /> : <BookOpen className="size-3.5" />}
+              {generating ? 'Gerando lote...' : 'Gerar Sessão Extra'}
             </button>
           </div>
         </CardContent>
       </Card>
+
+      {sessionMeta && !usingDemo && (
+        <p className="text-xs text-muted-foreground">
+          Lote ativo: {sessionMeta.generated} questão(ões) novas
+          {sessionMeta.mixed > 0 ? ` misturadas com ${sessionMeta.mixed} do acervo` : ' do acervo persistido'}.
+        </p>
+      )}
+
+      {adaptiveHint && !usingDemo && (
+        <p className="text-xs text-foreground/80 rounded-lg border border-border bg-muted/40 px-3 py-2">
+          {adaptiveHint}
+        </p>
+      )}
 
       {loadError && (
         <p className="text-xs text-destructive">{loadError}</p>

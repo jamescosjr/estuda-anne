@@ -9,10 +9,20 @@ import {
 import { IStudentAdaptiveProfileRepository } from './EvaluateQuizUseCase.js';
 import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
+import { composeAdaptiveSession, materialMatchesTopic } from '../services/FlashcardStudySession.js';
+import {
+  composeQuizSession,
+  flattenQuizzes,
+  questionMatchesTopic,
+  QuizBankItem,
+} from '../services/QuizStudySession.js';
 
 export interface GenerateExtraSessionInput {
   studentId: string;
   materialId?: string;
+  topic?: string;
+  count?: number;
+  excludeIds?: string[];
   targetType?: 'flashcards' | 'quiz' | 'both';
 }
 
@@ -23,6 +33,12 @@ export interface GenerateExtraSessionOutput {
   flashcards: Flashcard[];
   quiz?: Quiz | null;
   weakTopics: string[];
+  mixedDueCount: number;
+  adaptiveHint: string;
+  newCardIds: string[];
+  sessionQuestions: QuizBankItem[];
+  mixedBankCount: number;
+  newQuestionIds: string[];
 }
 
 export class GenerateExtraSessionUseCase {
@@ -41,9 +57,9 @@ export class GenerateExtraSessionUseCase {
   }
 
   public async execute(input: GenerateExtraSessionInput): Promise<GenerateExtraSessionOutput> {
-    const { studentId, materialId, targetType = 'both' } = input;
+    const { studentId, materialId, topic, targetType = 'both' } = input;
+    const count = Math.min(20, Math.max(5, input.count ?? 8));
 
-    // 1. Carrega materiais do estudante (ou material específico)
     let targetMaterials = [];
     if (materialId) {
       const mat = await this.materialRepository.findById(materialId);
@@ -52,67 +68,119 @@ export class GenerateExtraSessionUseCase {
       targetMaterials = (await this.materialRepository.findByStudentId(studentId)) || [];
     }
 
-    if (targetMaterials.length === 0) {
+    const matching = targetMaterials.filter((material) => materialMatchesTopic(material, topic));
+    const selected = matching.length > 0 ? matching : targetMaterials;
+
+    if (selected.length === 0) {
       throw new Error('Nenhum material cadastrado encontrado para gerar a sessão extra de estudos.');
     }
 
-    const primaryMaterial = targetMaterials[0];
-    const combinedText = targetMaterials.map((m) => m.rawContent).join('\n\n') || primaryMaterial.title;
-    const combinedKeyConcepts = Array.from(
-      new Set(targetMaterials.flatMap((m) => m.keyConcepts || []))
-    );
-
-    // 2. Carrega perfil adaptativo e tópicos de fragilidade recente do aluno
     let focusTopics: Array<{ topic: string; priorityWeight: number }> = [];
     let weakTopics: string[] = [];
+    let adaptiveHint = 'Distribuição uniforme entre os conceitos do material.';
 
     if (this.profileRepository) {
       const profile = await this.profileRepository.findByStudentId(studentId);
       if (profile && profile.topicWeights) {
-        focusTopics = Object.entries(profile.topicWeights).map(([topic, detail]) => ({
-          topic,
-          priorityWeight: detail.priorityWeight,
-        }));
-        weakTopics = focusTopics
-          .filter((t) => t.priorityWeight > 1.5)
-          .map((t) => t.topic);
+        focusTopics = Object.entries(profile.topicWeights)
+          .map(([topicName, detail]) => ({
+            topic: topicName,
+            priorityWeight: detail.priorityWeight,
+          }))
+          .sort((a, b) => b.priorityWeight - a.priorityWeight);
+        weakTopics = focusTopics.filter((t) => t.priorityWeight > 1.5).map((t) => t.topic);
+        adaptiveHint = profile.adaptivePromptInstruction;
       }
+    }
+
+    if (topic && topic !== 'all') {
+      focusTopics = [
+        { topic, priorityWeight: 3 },
+        ...focusTopics.filter((item) => item.topic.toLowerCase() !== topic.toLowerCase()),
+      ];
     }
 
     let generatedFlashcards: Flashcard[] = [];
     let generatedQuiz: Quiz | null = null;
+    const generatedQuizzes: Quiz[] = [];
 
-    // 3. Geração Adaptativa de Flashcards de reforço (se solicitado)
     if (targetType === 'flashcards' || targetType === 'both') {
-      generatedFlashcards = await this.flashcardAgent.generateFlashcards(
-        primaryMaterial.id,
-        studentId,
-        combinedText,
-        combinedKeyConcepts,
-        focusTopics,
-        true // Persiste no MongoDB agendado via SM-2
-      );
+      const perMaterial = Math.max(4, Math.ceil(count / selected.length));
+      for (const material of selected) {
+        const batch = await this.flashcardAgent.generateFlashcards(
+          material.id,
+          studentId,
+          material.rawContent || material.summary || material.title,
+          material.keyConcepts,
+          focusTopics,
+          true,
+          undefined,
+          perMaterial
+        );
+        generatedFlashcards.push(...batch);
+      }
     }
 
-    // 4. Geração Adaptativa de Quiz de reforço (se solicitado)
     if (targetType === 'quiz' || targetType === 'both') {
-      generatedQuiz = await this.quizAgent.generateQuiz(
-        primaryMaterial.id,
-        studentId,
-        `Sessão Extra: ${primaryMaterial.title}`,
-        combinedText,
-        focusTopics,
-        true // Persiste no MongoDB
-      );
+      const questionsNeeded = Math.max(4, Math.ceil(count * 0.55));
+      const perMaterial = Math.max(3, Math.ceil(questionsNeeded / selected.length));
+      for (const material of selected) {
+        const quiz = await this.quizAgent.generateQuiz(
+          material.id,
+          studentId,
+          `Sessão Extra: ${topic && topic !== 'all' ? topic : material.title}`,
+          material.rawContent || material.summary || material.title,
+          focusTopics,
+          true,
+          undefined,
+          perMaterial
+        );
+        if (quiz) {
+          generatedQuizzes.push(quiz);
+          generatedQuiz = quiz;
+        }
+      }
     }
+
+    const dueCards = await this.flashcardRepository.findDueCards(studentId, new Date(), count * 3);
+    const mixed = composeAdaptiveSession({
+      newCards: generatedFlashcards,
+      dueCards,
+      count,
+      excludeIds: input.excludeIds,
+    });
+
+    const sessionCards = mixed.session.length > 0 ? mixed.session : generatedFlashcards.slice(0, count);
+
+    const existingQuizzes = (await this.quizRepository.findByStudentId(studentId)) || [];
+    const generatedQuizIds = new Set(generatedQuizzes.map((quiz) => quiz.id));
+    const bankQuestions = flattenQuizzes(existingQuizzes)
+      .filter((item) => !generatedQuizIds.has(item.quizId))
+      .filter((item) => questionMatchesTopic(item, topic));
+    const newQuestions = flattenQuizzes(generatedQuizzes);
+    const quizMixed = composeQuizSession({
+      newQuestions,
+      bankQuestions,
+      count,
+      excludeIds: input.excludeIds,
+      weakTopics,
+    });
+    const sessionQuestions =
+      quizMixed.session.length > 0 ? quizMixed.session : newQuestions.slice(0, count);
 
     return {
       studentId,
       generatedFlashcardsCount: generatedFlashcards.length,
       generatedQuizId: generatedQuiz?.id,
-      flashcards: generatedFlashcards,
+      flashcards: sessionCards,
       quiz: generatedQuiz,
       weakTopics,
+      mixedDueCount: mixed.dueCount,
+      adaptiveHint,
+      newCardIds: generatedFlashcards.map((card) => card.id),
+      sessionQuestions,
+      mixedBankCount: quizMixed.bankCount,
+      newQuestionIds: newQuestions.map((item) => item.id),
     };
   }
 }

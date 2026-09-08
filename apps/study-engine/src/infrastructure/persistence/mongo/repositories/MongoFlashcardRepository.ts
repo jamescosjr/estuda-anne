@@ -3,7 +3,7 @@ import { Flashcard } from '../../../../domain/entities/Flashcard.js';
 import { IFlashcardRepository } from '../../../../domain/ports/IFlashcardRepository.js';
 import { FlashcardMongoDocument } from '../schemas/FlashcardMongoDocument.js';
 import { FlashcardMapper } from '../mappers/FlashcardMapper.js';
-import { isDuplicateOrHighlySimilar } from '../../../../domain/services/StudyCorpusSanitizer.js';
+import { uniqueByExactFront } from '../../../../domain/services/FlashcardStudySession.js';
 
 export class MongoFlashcardRepository implements IFlashcardRepository {
   private collection: Collection<FlashcardMongoDocument>;
@@ -35,27 +35,17 @@ export class MongoFlashcardRepository implements IFlashcardRepository {
   }
 
   public async findDueCards(studentId: string, asOfDate: Date, limit = 50): Promise<Flashcard[]> {
+    const fetchLimit = Math.max(limit * 4, 80);
     const docs = await this.collection
       .find({
         studentId,
         nextReviewDate: { $lte: asOfDate },
       })
       .sort({ nextReviewDate: 1 })
-      .limit(limit * 2)
+      .limit(fetchLimit)
       .toArray();
 
-    const domainCards = docs.map(FlashcardMapper.toDomain);
-    const uniqueCards: Flashcard[] = [];
-    const seenFronts: string[] = [];
-
-    for (const card of domainCards) {
-      if (isDuplicateOrHighlySimilar(card.front, seenFronts, 0.50)) continue;
-      seenFronts.push(card.front.trim());
-      uniqueCards.push(card);
-      if (uniqueCards.length >= limit) break;
-    }
-
-    return uniqueCards;
+    return uniqueByExactFront(docs.map(FlashcardMapper.toDomain)).slice(0, fetchLimit);
   }
 
   public async findByMaterialId(materialId: string): Promise<Flashcard[]> {
