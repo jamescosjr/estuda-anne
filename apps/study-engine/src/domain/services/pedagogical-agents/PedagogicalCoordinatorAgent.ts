@@ -38,8 +38,7 @@ export class PedagogicalCoordinatorAgent {
       // 1. Criação do Cache Centralizado de Contexto (GoogleAICacheManager)
       if (this.aiService?.createContextCache) {
         cacheHandle = await this.aiService.createContextCache({
-          mimeType: fileInput?.mimeType || material.mimeType,
-          dataBase64: fileInput?.fileBase64,
+          mimeType: 'text/plain',
           textContent: studyText,
           fileName: fileInput?.fileName || material.title,
         });
@@ -95,7 +94,7 @@ export class PedagogicalCoordinatorAgent {
         }
       }
 
-      if (!qualityResult.passed) {
+      if (!qualityResult.passed && flashcards.length === 0 && !quiz) {
         throw new Error(`Falha no controle de qualidade pedagógico após ${maxQualityRetries} tentativas: ${qualityResult.reason}`);
       }
 

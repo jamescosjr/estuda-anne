@@ -11,130 +11,14 @@ import { getApiUrl } from '@/lib/api-config'
 import { useAuth } from '@/lib/auth-context'
 import { fetchJson } from '@/lib/http'
 
-const academicFlashcardTemplates: Record<string, { front: string; back: string }[]> = {
-  'cálculo': [
-    {
-      front: 'O que representa geometricamente a derivada de uma função f(x) em um ponto x₀?',
-      back: 'Representa a inclinação (ou coeficiente angular) da reta tangente ao gráfico da função f(x) no ponto (x₀, f(x₀)).',
-    },
-    {
-      front: 'Qual é o enunciado fundamental do Teorema Fundamental do Cálculo?',
-      back: 'Conecta a derivação à integração, estabelecendo que se F é uma primitiva de f contínua em [a,b], então ∫_a^b f(x)dx = F(b) - F(a).',
-    },
-    {
-      front: 'O que é um ponto de inflexão no gráfico de uma função f(x)?',
-      back: 'É um ponto onde a concavidade do gráfico muda de sentido (onde a segunda derivada f\'\'(x) troca de sinal ou se anula).',
-    },
-    {
-      front: 'Como a regra de L\'Hôpital é aplicada no cálculo de limites?',
-      back: 'Para indeterminações do tipo 0/0 ou ∞/∞, o limite do quociente f(x)/g(x) é igual ao limite do quociente de suas derivadas f\'(x)/g\'(x).',
-    },
-    {
-      front: 'Qual a diferença entre integral definida e integral indefinida?',
-      back: 'Integral indefinida representa uma família de funções (primitivas com constante C); a integral definida resulta em um valor numérico que representa área líquida.',
-    },
-  ],
-  'bioquímica': [
-    {
-      front: 'O que caracteriza a estrutura secundária de uma proteína e quais são seus principais padrões?',
-      back: 'Caracteriza-se pelo arranjo espacial local da cadeia polipeptídica mantido por pontes de hidrogênio. Os dois principais padrões são a Alfa-Hélice e a Folha-Beta.',
-    },
-    {
-      front: 'O que é a modulação alostérica em enzimas?',
-      back: 'É a regulação da atividade enzimática pela ligação de um efetor em um sítio diferente do sítio ativo (sítio alostérico), alterando a conformação da enzima.',
-    },
-    {
-      front: 'Qual o papel funcional do ATP (Adenosina Trifosfato) no metabolismo?',
-      back: 'Atua como a "moeda energética" universal da célula, armazenando energia química em suas ligações anidro de fosfato de alta energia.',
-    },
-    {
-      front: 'Qual a diferença crucial entre fotossíntese e respiração celular?',
-      back: 'Fotossíntese sintetiza glicose e O₂ consumindo CO₂, H₂O e luz (anabolismo). Respiração oxidativa degrada glicose e O₂ gerando CO₂, H₂O e ATP (catabolismo).',
-    },
-    {
-      front: 'O que define a desnaturação proteica e quais fatores a provocam?',
-      back: 'É a perda da estrutura tridimensional nativa (terciária/secundária) sem quebrar ligações peptídicas, provocada por calor, pH extremo ou reagentes caotrópicos.',
-    },
-  ],
-  'algoritmos': [
-    {
-      front: 'Qual a principal diferença de funcionamento entre uma estrutura de dados Pilha (Stack) e uma Fila (Queue)?',
-      back: 'Pilha opera no sistema LIFO (Last In, First Out — o último a entrar é o primeiro a sair). Fila opera no sistema FIFO (First In, First Out — o primeiro a entrar é o primeiro a sair).',
-    },
-    {
-      front: 'O que define a técnica de programação chamada Divisão e Conquista?',
-      back: 'Dividir o problema em subproblemas menores do mesmo tipo, resolvê-los recursivamente e combinar suas soluções para resolver o problema original.',
-    },
-    {
-      front: 'Qual a vantagem da busca em Tabela Hash em relação à busca em Árvore Binária de Busca (BST)?',
-      back: 'A Tabela Hash busca em tempo médio constante O(1), enquanto a BST busca em tempo logarítmico O(log n).',
-    },
-    {
-      front: 'Em teoria da computação, o que caracteriza a classe de problemas NP-Completo?',
-      back: 'Problemas cuja solução pode ser verificada em tempo polinomial, mas para os quais não se conhece algoritmo polinomial de resolução.',
-    },
-    {
-      front: 'Qual a diferença entre algoritmos gulosos (Greedy) e Programação Dinâmica?',
-      back: 'Algoritmos gulosos tomam a escolha ótima local a cada passo sem rever decisões. Programação dinâmica resolve subproblemas sobrepostos armazenando os resultados.',
-    },
-  ],
-}
-
-function generateAcademicFlashcards(subjects: string[], targetCount = 5, subjectFilter = 'all'): FlashcardItem[] {
-  const selectedSubjects = (!subjects || subjects.length === 0)
-    ? ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
-    : (subjectFilter !== 'all' ? [subjectFilter] : subjects)
-
-  const list: FlashcardItem[] = []
-  const usedFronts = new Set<string>()
-
-  // 1. Coleta cartões dos templates predefinidos
-  for (const sub of selectedSubjects) {
-    const lowerSub = sub.toLowerCase()
-    const matchKey = Object.keys(academicFlashcardTemplates).find((k) => lowerSub.includes(k))
-    if (matchKey && academicFlashcardTemplates[matchKey]) {
-      for (const t of academicFlashcardTemplates[matchKey]) {
-        if (!usedFronts.has(t.front.toLowerCase())) {
-          usedFronts.add(t.front.toLowerCase())
-          list.push({
-            id: `fc-${sub}-${list.length}`,
-            subject: sub,
-            front: t.front,
-            back: t.back,
-            persisted: false,
-          })
-          if (list.length >= targetCount) break
-        }
-      }
-    }
-    if (list.length >= targetCount) break
-  }
-
-  // 2. Se a quantidade solicitada for superior aos templates estáticos, gera cartões conceituais inéditos sem repetição
-  let fillIdx = 0
-  while (list.length < targetCount) {
-    const sub = selectedSubjects[fillIdx % selectedSubjects.length]
-    const cardNum = list.length + 1
-    const uniqueFront = `[Card de Revisão — ${sub} #${cardNum}] Quais são as aplicações práticas essenciais de ${sub} no aprendizado universitário?`
-
-    if (!usedFronts.has(uniqueFront.toLowerCase())) {
-      usedFronts.add(uniqueFront.toLowerCase())
-      list.push({
-        id: `fc-gen-${sub}-${list.length}`,
-        subject: sub,
-        front: uniqueFront,
-        back: `A disciplina de ${sub} desenvolve o raciocínio analítico para resolução de problemas e consolidação de competências técnicas requeridas nos exames.`,
-        persisted: false,
-      })
-    }
-    fillIdx++
-  }
-
-  return list
-}
-
 const DEFAULT_SUBJECTS = ['Cálculo I', 'Bioquímica', 'Algoritmos e Estruturas de Dados']
 const SEEN_CARDS_KEY = 'estuda-anne.flashcards.seen-ids'
+
+function isPlaceholderFront(front: string): boolean {
+  const t = (front || '').toLowerCase()
+  return t.includes('[card de revisão') ||
+    (t.includes('aplicações práticas essenciais') && t.includes('aprendizado universitário'))
+}
 
 function readSeenCardIds(): string[] {
   if (typeof window === 'undefined') return []
@@ -194,21 +78,25 @@ export function ReviewSession() {
         )
         if (ok && Array.isArray(data) && data.length > 0) {
           const seen = new Set(readSeenCardIds())
-          const mapped: FlashcardItem[] = data.map((fc: any) => mapApiCard(fc, false))
-          const unseen = mapped.filter((card) => !seen.has(card.id))
-          const rest = mapped.filter((card) => seen.has(card.id))
-          const ordered = [...unseen, ...rest]
-          const filtered = subjectFilter === 'all'
-            ? ordered
-            : ordered.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
-          const pool = filtered.length > 0 ? filtered : ordered
-          setPersistedPool(mapped)
-          setCards(pool.slice(0, targetCount))
-          rememberSeenCardIds(pool.slice(0, targetCount).map((card) => card.id))
-          setUsingDemo(false)
-          setAdaptiveHint(null)
-          setSessionMeta(null)
-          return
+          const mapped: FlashcardItem[] = data
+            .map((fc: any) => mapApiCard(fc, false))
+            .filter((card) => !isPlaceholderFront(card.front))
+          if (mapped.length > 0) {
+            const unseen = mapped.filter((card) => !seen.has(card.id))
+            const rest = mapped.filter((card) => seen.has(card.id))
+            const ordered = [...unseen, ...rest]
+            const filtered = subjectFilter === 'all'
+              ? ordered
+              : ordered.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
+            const pool = filtered.length > 0 ? filtered : ordered
+            setPersistedPool(mapped)
+            setCards(pool.slice(0, targetCount))
+            rememberSeenCardIds(pool.slice(0, targetCount).map((card) => card.id))
+            setUsingDemo(false)
+            setAdaptiveHint(null)
+            setSessionMeta(null)
+            return
+          }
         }
         if (!ok) {
           setLoadError('Não foi possível carregar os flashcards agora. Tente de novo em instantes.')
@@ -217,9 +105,12 @@ export function ReviewSession() {
         setLoadError('Não foi possível carregar os flashcards agora. Tente de novo em instantes.')
       }
 
-      setUsingDemo(true)
+      setUsingDemo(false)
       setPersistedPool([])
-      setCards(generateAcademicFlashcards(availableSubjects, targetCount, subjectFilter))
+      setCards([])
+      if (!loadError) {
+        setLoadError(null)
+      }
     }
 
     loadDueCards()
@@ -257,7 +148,13 @@ export function ReviewSession() {
       const newFlashcards = data?.flashcards || []
       if (ok && Array.isArray(newFlashcards) && newFlashcards.length > 0) {
         const newIds = new Set(data?.newCardIds || [])
-        const mapped: FlashcardItem[] = newFlashcards.map((fc: any) => mapApiCard(fc, newIds.has(fc.id)))
+        const mapped: FlashcardItem[] = newFlashcards
+          .map((fc: any) => mapApiCard(fc, newIds.has(fc.id)))
+          .filter((card) => !isPlaceholderFront(card.front))
+        if (mapped.length === 0) {
+          setLoadError('A sessão extra não trouxe cards de conteúdo. Envie material em Materiais e tente de novo.')
+          return
+        }
         setPersistedPool((prev) => {
           const byId = new Map(prev.map((card) => [card.id, card]))
           mapped.forEach((card) => byId.set(card.id, card))
@@ -414,6 +311,21 @@ export function ReviewSession() {
         <p className="text-xs text-muted-foreground">
           Demonstração: estes cards não vieram do seu material. Envie apostilas em Materiais para revisar o conteúdo persistido.
         </p>
+      )}
+
+      {!generating && total === 0 && (
+        <Card>
+          <CardContent className="p-8 text-center space-y-3">
+            <h2 className="font-display text-lg font-semibold">Nenhum flashcard de conteúdo ainda</h2>
+            <p className="text-sm text-muted-foreground text-pretty">
+              A fila não usa mais cartões genéricos. Envie um material da matéria ou toque em
+              {' '}
+              <strong>Gerar Sessão Extra</strong>
+              {' '}
+              para criar cards a partir do que já está no banco.
+            </p>
+          </CardContent>
+        </Card>
       )}
 
       {total > 0 && cards[current] && (

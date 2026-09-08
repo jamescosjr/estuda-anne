@@ -186,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const bffUrl = getApiUrl()
-      await fetch(`${bffUrl}/api/users/profile`, {
+      const response = await fetch(`${bffUrl}/api/users/profile`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -194,13 +194,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
         body: JSON.stringify(profileData),
       })
-    } catch (err) {
-      console.warn('Atualizando estado local de perfil (modo offline/demo):', err)
-    }
 
-    saveAuthSession(updatedUser, token || 'demo-token')
-    return { success: true }
-  }
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        return {
+          success: false,
+          error: data?.message || 'Não foi possível salvar o perfil no servidor.',
+        }
+      }
+
+      const persisted: User = {
+        ...updatedUser,
+        id: data.id || updatedUser.id,
+        name: data.name ?? updatedUser.name,
+        email: data.email ?? updatedUser.email,
+        role: data.role === 'ADMIN' ? 'ADMIN' : updatedUser.role,
+        course: data.course ?? updatedUser.course,
+        period: data.period ?? updatedUser.period,
+        periodStartDate: data.periodStartDate ?? updatedUser.periodStartDate,
+        periodEndDate: data.periodEndDate ?? updatedUser.periodEndDate,
+        examDates: data.examDates ?? updatedUser.examDates,
+        subjects: data.subjects ?? updatedUser.subjects,
+        studyGoalMinutes: data.studyGoalMinutes ?? updatedUser.studyGoalMinutes,
+        isProfileComplete: data.isProfileComplete ?? updatedUser.isProfileComplete,
+      }
+
+      saveAuthSession(persisted, token || '')
+      return { success: true }
+    } catch (err) {
+      console.error('Erro ao persistir perfil:', err)
+      return {
+        success: false,
+        error: 'Não foi possível conectar ao servidor para salvar o perfil.',
+      }
+    }
 
   function loginAsDemo(role: 'ADMIN' | 'STUDENT') {
     if (role === 'ADMIN') {

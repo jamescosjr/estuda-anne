@@ -14,8 +14,8 @@ export function DailyBriefingCard() {
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [isDone, setIsDone] = useState<boolean>(false)
 
-  const studentId = user?.id || 'anne-student-1'
-  const studentName = user?.name || 'Anne'
+  const studentId = user?.id
+  const studentName = user?.name || 'Estudante'
 
   const fetchBriefingStream = async () => {
     setIsLoading(true)
@@ -24,6 +24,12 @@ export function DailyBriefingCard() {
 
     try {
       const baseUrl = getApiUrl()
+      if (!studentId) {
+        setBriefingText('Faça login para ver o briefing do seu plano de estudos.')
+        setIsLoading(false)
+        setIsDone(true)
+        return
+      }
       const url = `${baseUrl}/api/daily-briefing?studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(studentName)}`
 
       const response = await fetch(url)

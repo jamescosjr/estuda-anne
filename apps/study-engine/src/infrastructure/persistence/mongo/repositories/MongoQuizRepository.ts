@@ -13,7 +13,7 @@ export class MongoQuizRepository implements IQuizRepository {
 
   public async save(quiz: Quiz): Promise<void> {
     const doc = QuizMapper.toPersistence(quiz);
-    await this.collection.insertOne(doc);
+    await this.collection.replaceOne({ _id: doc._id }, doc, { upsert: true });
   }
 
   public async findById(id: string): Promise<Quiz | null> {

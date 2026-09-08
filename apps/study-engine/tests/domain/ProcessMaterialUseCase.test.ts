@@ -206,7 +206,9 @@ describe('ProcessMaterialUseCase', () => {
       findById: vi.fn(),
       findByStudentId: vi.fn(),
       findDueCards: vi.fn(),
-      findByMaterialId: vi.fn().mockResolvedValue([]),
+      findByMaterialId: vi.fn().mockResolvedValue([
+        { id: 'fc-existing', front: 'O que e derivada?', back: 'Taxa de variacao' },
+      ]),
       update: vi.fn(),
       delete: vi.fn(),
       deleteByStudentId: vi.fn(),
@@ -215,7 +217,7 @@ describe('ProcessMaterialUseCase', () => {
     const quizRepo: IQuizRepository = {
       save: vi.fn(),
       findById: vi.fn(),
-      findByMaterialId: vi.fn().mockResolvedValue([]),
+      findByMaterialId: vi.fn().mockResolvedValue([{ id: 'quiz-existing' }]),
       findByStudentId: vi.fn(),
       delete: vi.fn(),
       deleteByStudentId: vi.fn(),
@@ -232,6 +234,7 @@ describe('ProcessMaterialUseCase', () => {
     const result = await useCase.execute({ materialId: 'mat-ready' });
 
     expect(result.status).toBe('READY');
+    expect(result.generatedFlashcardsCount).toBe(1);
     expect(aiService.extractConceptsAndSummary).not.toHaveBeenCalled();
   });
 
@@ -319,8 +322,7 @@ describe('ProcessMaterialUseCase', () => {
 
     expect(result.status).toBe('READY');
     expect(aiService.createContextCache).toHaveBeenCalledWith({
-      mimeType: 'application/pdf',
-      dataBase64: 'JVBERi0xLjQK...',
+      mimeType: 'text/plain',
       textContent: expect.stringContaining('Heisenberg'),
       fileName: 'fisica.pdf',
     });

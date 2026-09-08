@@ -6,6 +6,7 @@ import {
   questionMatchesTopic,
   QuizBankItem,
 } from '../services/QuizStudySession.js';
+import { isGenericPlaceholderPrompt, isPedagogicallyOffTopic } from '../services/StudyCorpusSanitizer.js';
 
 export interface GetQuizSessionInput {
   studentId: string;
@@ -35,7 +36,12 @@ export class GetQuizSessionUseCase {
 
     const count = Math.min(20, Math.max(3, input.count ?? 8));
     const quizzes = (await this.quizRepository.findByStudentId(input.studentId)) || [];
-    const bank = flattenQuizzes(quizzes).filter((item) => questionMatchesTopic(item, input.topic));
+    const bank = flattenQuizzes(quizzes).filter(
+      (item) =>
+        questionMatchesTopic(item, input.topic) &&
+        !isGenericPlaceholderPrompt(item.prompt) &&
+        !isPedagogicallyOffTopic(item.prompt)
+    );
 
     let weakTopics: string[] = [];
     let adaptiveHint = 'Distribuição uniforme entre as questões já persistidas.';

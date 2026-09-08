@@ -20,7 +20,12 @@ export class MongoFlashcardRepository implements IFlashcardRepository {
   public async saveMany(flashcards: Flashcard[]): Promise<void> {
     if (flashcards.length === 0) return;
     const docs = flashcards.map(FlashcardMapper.toPersistence);
-    await this.collection.insertMany(docs);
+    await this.collection.bulkWrite(
+      docs.map((doc) => ({
+        replaceOne: { filter: { _id: doc._id }, replacement: doc, upsert: true },
+      })),
+      { ordered: false }
+    );
   }
 
   public async findById(id: string): Promise<Flashcard | null> {

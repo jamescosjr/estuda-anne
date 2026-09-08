@@ -1,5 +1,6 @@
 import { IQuizRepository } from '../ports/IQuizRepository.js';
 import { QuizEvaluationResult } from '../entities/Quiz.js';
+import { NotFoundError } from '../errors/DomainError.js';
 import { StudentAdaptiveProfile } from '../entities/StudentAdaptiveProfile.js';
 
 export interface EvaluateQuizDTO {
@@ -36,7 +37,7 @@ export class EvaluateQuizUseCase {
   public async execute(dto: EvaluateQuizDTO): Promise<EvaluateQuizOutput> {
     const quiz = await this.quizRepository.findById(dto.quizId);
     if (!quiz) {
-      throw new Error(`Quiz não encontrado para o id: ${dto.quizId}`);
+      throw new NotFoundError(`Quiz não encontrado para o id: ${dto.quizId}`);
     }
 
     const evaluation = quiz.evaluate(dto.answers);

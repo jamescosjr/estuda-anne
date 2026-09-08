@@ -141,6 +141,20 @@ export function readZipLocalEntries(buffer: Buffer): Array<{ name: string; data:
   return entries;
 }
 
+export function extractTextFromDocxBuffer(buffer: Buffer): string {
+  const entries = readZipLocalEntries(buffer);
+  const texts: string[] = [];
+
+  for (const entry of entries) {
+    if (!/^word\/document\.xml$/i.test(entry.name)) continue;
+    const xml = entry.data.toString('utf8');
+    const runs = [...xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)].map((m) => m[1]);
+    texts.push(...runs);
+  }
+
+  return texts.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 export function extractTextFromPptxBuffer(buffer: Buffer): string {
   const entries = readZipLocalEntries(buffer);
   const slideTexts: string[] = [];
@@ -177,6 +191,15 @@ export class DocumentTextExtractor implements IContentExtractor {
 
     if (mime.includes('pdf') || name.endsWith('.pdf')) {
       return extractTextFromPdfBuffer(buffer);
+    }
+
+    if (
+      mime.includes('wordprocessingml') ||
+      mime.includes('msword') ||
+      name.endsWith('.docx') ||
+      name.endsWith('.doc')
+    ) {
+      return extractTextFromDocxBuffer(buffer);
     }
 
     if (mime.includes('presentation') || name.endsWith('.pptx') || name.endsWith('.ppt')) {

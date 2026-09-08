@@ -13,6 +13,7 @@ import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/Flashca
 import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
 import { QualityGateAgent } from '../services/pedagogical-agents/QualityGateAgent.js';
 import { PedagogicalCoordinatorAgent } from '../services/pedagogical-agents/PedagogicalCoordinatorAgent.js';
+import { isUnusableStudyCorpus } from '../services/StudyCorpusSanitizer.js';
 
 export interface ProcessMaterialInput {
   materialId: string;
@@ -75,17 +76,22 @@ export class ProcessMaterialUseCase {
       if (material.isReady() && !input.force) {
         const existingCards = await this.flashcardRepository.findByMaterialId(material.id);
         const existingQuizzes = await this.quizRepository.findByMaterialId(material.id);
-        return {
-          materialId: material.id,
-          status: material.status,
-          summary: material.summary,
-          keyConcepts: material.keyConcepts,
-          generatedFlashcardsCount: existingCards.length,
-          generatedQuizId: existingQuizzes[0]?.id,
-        };
+        if (existingCards.length > 0) {
+          return {
+            materialId: material.id,
+            status: material.status,
+            summary: material.summary,
+            keyConcepts: material.keyConcepts,
+            generatedFlashcardsCount: existingCards.length,
+            generatedQuizId: existingQuizzes[0]?.id,
+          };
+        }
       }
 
-      let rawText = input.textContent?.trim() || material.rawContent;
+      let rawText = input.textContent?.trim() || material.rawContent || '';
+      if (isUnusableStudyCorpus(rawText)) {
+        rawText = '';
+      }
 
       if ((!rawText || rawText.trim().length === 0) && input.fileBase64) {
         if (this.contentExtractor) {
@@ -96,13 +102,28 @@ export class ProcessMaterialUseCase {
             mimeType: input.mimeType || material.mimeType,
             fileName: input.fileName || material.title,
           });
+          if (isUnusableStudyCorpus(rawText)) {
+            rawText = '';
+          }
         }
 
-        if ((!rawText || rawText.trim().length === 0) && this.aiService.extractTextFromMultimodalDocument) {
-          rawText = await this.aiService.extractTextFromMultimodalDocument({
-            mimeType: input.mimeType || material.mimeType,
-            dataBase64: input.fileBase64,
-          });
+        const mime = (input.mimeType || material.mimeType || '').toLowerCase();
+        const canUseVision = mime.includes('pdf') || mime.includes('image');
+        if ((!rawText || rawText.trim().length === 0) && canUseVision && this.aiService.extractTextFromMultimodalDocument) {
+          try {
+            rawText = await this.aiService.extractTextFromMultimodalDocument({
+              mimeType: input.mimeType || material.mimeType,
+              dataBase64: input.fileBase64,
+            });
+          } catch (extractError: any) {
+            const message = extractError?.message || String(extractError);
+            if (/RECITATION|blocked due to/i.test(message)) {
+              throw new Error(
+                'O Gemini bloqueou a leitura do PDF por semelhança com obra protegida. Envie um .docx ou um PDF com texto selecionável (não digitalizado).'
+              );
+            }
+            throw extractError;
+          }
         }
       }
 
@@ -117,8 +138,8 @@ export class ProcessMaterialUseCase {
         rawText = transcription.text;
       }
 
-      if (!rawText || rawText.trim().length === 0) {
-        throw new Error('Não foi possível extrair texto do arquivo (PDF sem camada de texto selecionável ou digitalizado). Envie um documento com texto selecionável.');
+      if (!rawText || rawText.trim().length === 0 || isUnusableStudyCorpus(rawText)) {
+        throw new Error('Não foi possível extrair texto do arquivo (PDF sem camada de texto, DOCX/ZIP binário ou digitalizado). Envie um documento com texto selecionável ou um .docx válido.');
       }
 
       material.setRawContent(rawText);
@@ -126,7 +147,6 @@ export class ProcessMaterialUseCase {
 
       // Execução orquestrada pelo PedagogicalCoordinatorAgent com suporte a Gemini Context Caching
       const result = await this.coordinatorAgent.orchestrateProcessing(material, rawText, {
-        fileBase64: input.fileBase64,
         mimeType: input.mimeType || material.mimeType,
         fileName: input.fileName || material.title,
       });

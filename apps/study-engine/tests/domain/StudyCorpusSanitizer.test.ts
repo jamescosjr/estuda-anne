@@ -4,6 +4,9 @@ import {
   sanitizeStudyCorpus,
   isDocumentMetaReferencing,
   isDuplicateOrHighlySimilar,
+  isGenericPlaceholderPrompt,
+  isUnusableStudyCorpus,
+  materialHasStudyCorpus,
 } from '../../src/domain/services/StudyCorpusSanitizer.js';
 
 describe('StudyCorpusSanitizer', () => {
@@ -72,5 +75,30 @@ describe('StudyCorpusSanitizer', () => {
         0.60
       )
     ).toBe(false);
+  });
+
+  it('rejeita flashcards genericos de demonstracao (Card de Revisao / aplicacoes praticas essenciais)', () => {
+    expect(
+      isGenericPlaceholderPrompt(
+        '[Card de Revisão — Francês #2] Quais são as aplicações práticas essenciais de Francês no aprendizado universitário?'
+      )
+    ).toBe(true);
+    expect(
+      isPedagogicallyOffTopic(
+        '[Card de Revisão — Fundamentos de IA e LLMs para Programadores #1] Quais são as aplicações práticas essenciais de Fundamentos de IA e LLMs para Programadores no aprendizado universitário?'
+      )
+    ).toBe(true);
+    expect(isGenericPlaceholderPrompt('O que caracteriza o fine-tuning supervisionado de um LLM?')).toBe(false);
+  });
+
+  it('rejeita corpus ZIP/DOCX binario e resumo de extracao falha', () => {
+    expect(isUnusableStudyCorpus('PK\u0003\u0004' + '[Content_Types].xml ' + 'x'.repeat(40))).toBe(true);
+    expect(
+      materialHasStudyCorpus(
+        'PK\u0003\u0004[Content_Types].xml' + 'x'.repeat(80),
+        'O material fornecido consiste em dados binários brutos de um arquivo compactado (estrutura interna de um arquivo .docx/ZIP).'
+      )
+    ).toBe(false);
+    expect(materialHasStudyCorpus('Le present de l indicatif se forme avec les terminaisons e es e ons ez ent.', undefined)).toBe(true);
   });
 });

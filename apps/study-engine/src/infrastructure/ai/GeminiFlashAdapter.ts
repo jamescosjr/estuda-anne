@@ -831,22 +831,46 @@ Retorne APENAS o texto extraído do material na íntegra, sem formatação markd
       const controller = new AbortController();
       const timeoutTimer = setTimeout(() => controller.abort(), 120000);
 
-      try {
-        const result = await model.generateContent(
-          [
-            {
-              fileData: {
-                mimeType: uploadedFile.mimeType,
-                fileUri: uploadedFile.uri,
-              },
-            },
-            { text: prompt },
-          ],
-          { requestOptions: { timeout: 120000, signal: controller.signal } } as any
-        );
+      const paraphrasePrompt = `Você extrai conceitos acadêmicos para estudo.
+Não copie trechos longos da obra. Reescreva o conteúdo em palavras próprias, frases curtas (máximo 20 palavras), lista de conceitos e definições originais.
+Se o arquivo for protegido por direitos autorais, resuma só a estrutura pedagógica (temas, vocabulário, regras) sem citar parágrafos.
 
-        const responseText = result.response.text();
-        return responseText ? responseText.trim() : '';
+Retorne apenas o texto reescrito.`;
+
+      const prompts = [prompt, paraphrasePrompt];
+      let lastError: unknown;
+
+      try {
+        for (const currentPrompt of prompts) {
+          try {
+            const result = await model.generateContent(
+              [
+                {
+                  fileData: {
+                    mimeType: uploadedFile.mimeType,
+                    fileUri: uploadedFile.uri,
+                  },
+                },
+                { text: currentPrompt },
+              ],
+              { requestOptions: { timeout: 120000, signal: controller.signal } } as any
+            );
+
+            const responseText = result.response.text();
+            if (responseText && responseText.trim()) {
+              return responseText.trim();
+            }
+          } catch (error) {
+            lastError = error;
+            const message = error instanceof Error ? error.message : String(error);
+            if (!/RECITATION|blocked due to/i.test(message)) {
+              throw error;
+            }
+          }
+        }
+
+        if (lastError) throw lastError;
+        return '';
       } finally {
         clearTimeout(timeoutTimer);
       }

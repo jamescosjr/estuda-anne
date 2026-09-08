@@ -134,7 +134,7 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
     setSuccessMessage(false)
 
     try {
-      await updateProfile({
+      const profileResult = await updateProfile({
         name,
         course,
         period,
@@ -145,13 +145,22 @@ export function ProfileScreen({ onSaveAndGenerateSchedule }: ProfileScreenProps)
         studyGoalMinutes,
       })
 
-      // Requisitar geração de cronograma no BFF com as novas datas
+      if (!profileResult.success) {
+        alert(profileResult.error || 'Não foi possível salvar o perfil.')
+        return
+      }
+
+      if (!user?.id) {
+        alert('Perfil salvo, mas não foi possível gerar o cronograma: sessão sem usuário.')
+        return
+      }
+
       const bffUrl = getApiUrl()
       const scheduleRes = await fetch(`${bffUrl}/api/study/schedule/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: user?.id || 'anne-student-1',
+          studentId: user.id,
           title: `Cronograma — ${course}`,
           subjects,
           periodStartDate: periodStartDate || undefined,

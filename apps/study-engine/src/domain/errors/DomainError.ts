@@ -13,3 +13,9 @@ export class NotFoundError extends DomainError {
     super(message, 404, 'NotFound');
   }
 }
+
+export class UnprocessableError extends DomainError {
+  constructor(message: string) {
+    super(message, 422, 'UnprocessableEntity');
+  }
+}

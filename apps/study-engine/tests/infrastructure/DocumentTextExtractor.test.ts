@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   DocumentTextExtractor,
   extractTextFromPdfBuffer,
+  extractTextFromDocxBuffer,
 } from '../../src/infrastructure/extraction/DocumentTextExtractor.js';
 
 describe('DocumentTextExtractor', () => {
@@ -52,5 +53,31 @@ describe('DocumentTextExtractor', () => {
 
     const extracted = extractTextFromPdfBuffer(pdf);
     expect(extracted).toContain('Conceito de calculo diferencial');
+  });
+
+  it('extrai texto de word/document.xml em um DOCX (ZIP)', async () => {
+    const { deflateRawSync } = await import('node:zlib');
+    const xml = Buffer.from(
+      '<?xml version="1.0"?><w:document><w:t>Le verbe etre au present</w:t><w:t> je suis tu es</w:t></w:document>',
+      'utf8'
+    );
+    const compressed = deflateRawSync(xml);
+    const name = Buffer.from('word/document.xml');
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0);
+    header.writeUInt16LE(8, 8);
+    header.writeUInt32LE(compressed.length, 18);
+    header.writeUInt16LE(name.length, 26);
+    const docx = Buffer.concat([header, name, compressed]);
+
+    expect(extractTextFromDocxBuffer(docx)).toContain('verbe etre');
+
+    const extractor = new DocumentTextExtractor();
+    const result = await extractor.extractText({
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName: 'Apostila.docx',
+      fileBase64: docx.toString('base64'),
+    });
+    expect(result).toContain('je suis');
   });
 });

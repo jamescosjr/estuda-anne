@@ -10,6 +10,8 @@ import { IStudentAdaptiveProfileRepository } from './EvaluateQuizUseCase.js';
 import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
 import { composeAdaptiveSession, materialMatchesTopic } from '../services/FlashcardStudySession.js';
+import { materialHasStudyCorpus } from '../services/StudyCorpusSanitizer.js';
+import { UnprocessableError } from '../errors/DomainError.js';
 import {
   composeQuizSession,
   flattenQuizzes,
@@ -69,10 +71,12 @@ export class GenerateExtraSessionUseCase {
     }
 
     const matching = targetMaterials.filter((material) => materialMatchesTopic(material, topic));
-    const selected = matching.length > 0 ? matching : targetMaterials;
+    const selected = (matching.length > 0 ? matching : targetMaterials).filter((material) =>
+      materialHasStudyCorpus(material.rawContent, material.summary)
+    );
 
-    if (selected.length === 0) {
-      throw new Error('Nenhum material cadastrado encontrado para gerar a sessão extra de estudos.');
+    if (targetMaterials.length === 0) {
+      throw new UnprocessableError('Nenhum material cadastrado encontrado para gerar a sessão extra de estudos.');
     }
 
     let focusTopics: Array<{ topic: string; priorityWeight: number }> = [];
@@ -104,7 +108,7 @@ export class GenerateExtraSessionUseCase {
     let generatedQuiz: Quiz | null = null;
     const generatedQuizzes: Quiz[] = [];
 
-    if (targetType === 'flashcards' || targetType === 'both') {
+    if (selected.length > 0 && (targetType === 'flashcards' || targetType === 'both')) {
       const perMaterial = Math.max(4, Math.ceil(count / selected.length));
       for (const material of selected) {
         const batch = await this.flashcardAgent.generateFlashcards(
@@ -121,7 +125,7 @@ export class GenerateExtraSessionUseCase {
       }
     }
 
-    if (targetType === 'quiz' || targetType === 'both') {
+    if (selected.length > 0 && (targetType === 'quiz' || targetType === 'both')) {
       const questionsNeeded = Math.max(4, Math.ceil(count * 0.55));
       const perMaterial = Math.max(3, Math.ceil(questionsNeeded / selected.length));
       for (const material of selected) {
@@ -143,9 +147,10 @@ export class GenerateExtraSessionUseCase {
     }
 
     const dueCards = await this.flashcardRepository.findDueCards(studentId, new Date(), count * 3);
+    const bankCards = (await this.flashcardRepository.findByStudentId(studentId, 200)) || [];
     const mixed = composeAdaptiveSession({
       newCards: generatedFlashcards,
-      dueCards,
+      dueCards: [...dueCards, ...bankCards],
       count,
       excludeIds: input.excludeIds,
     });
@@ -167,6 +172,16 @@ export class GenerateExtraSessionUseCase {
     });
     const sessionQuestions =
       quizMixed.session.length > 0 ? quizMixed.session : newQuestions.slice(0, count);
+
+    if (
+      (targetType === 'flashcards' && sessionCards.length === 0) ||
+      (targetType === 'quiz' && sessionQuestions.length === 0) ||
+      (targetType === 'both' && sessionCards.length === 0 && sessionQuestions.length === 0)
+    ) {
+      throw new UnprocessableError(
+        'Há material cadastrado, mas o texto pedagógico ainda não foi extraído e não há acervo persistido. Reenvie o arquivo (PDF com texto selecionável ou DOCX) em Materiais.'
+      );
+    }
 
     return {
       studentId,

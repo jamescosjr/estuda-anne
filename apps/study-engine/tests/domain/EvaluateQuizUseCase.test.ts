@@ -67,4 +67,17 @@ describe('EvaluateQuizUseCase & Mecânica de Pesos Adaptativos', () => {
     expect(result.adaptiveProfile.weakTopics).toContain('Integrais');
     expect(mockProfileRepository.save).toHaveBeenCalledOnce();
   });
+
+  it('lanca NotFoundError 404 quando o quiz nao existe', async () => {
+    mockQuizRepository.findById = vi.fn().mockResolvedValue(null);
+    const useCase = new EvaluateQuizUseCase(mockQuizRepository, mockProfileRepository);
+
+    await expect(
+      useCase.execute({
+        quizId: 'qz-gen-demo-1',
+        studentId: 'anne-test-student',
+        answers: [{ questionId: 'q-1', selectedOptionIndex: 0 }],
+      })
+    ).rejects.toMatchObject({ statusCode: 404, name: 'NotFound' });
+  });
 });

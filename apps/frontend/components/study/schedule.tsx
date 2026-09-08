@@ -153,13 +153,17 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
       return
     }
 
+    if (!user?.id) {
+      return
+    }
+
     setClosing(true)
     const bffUrl = getApiUrl()
     try {
       const response = await fetch(`${bffUrl}/api/semesters/close`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId: user?.id || 'student-anne-demo' }),
+        body: JSON.stringify({ studentId: user.id }),
       })
       if (response.ok) {
         setClosedSuccess(true)

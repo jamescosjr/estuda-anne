@@ -97,6 +97,16 @@ export function isPedagogicallyOffTopic(prompt: string): boolean {
   if (ISO_DATE.test(prompt) || PDF_DATE.test(prompt) || NODE_DATE_STR.test(prompt)) return true;
   if (/\banne\b/i.test(t)) return true;
   if (/\bautor\b/.test(t) && /(pdf|documento|arquivo|metadad)/.test(t)) return true;
+  if (isGenericPlaceholderPrompt(prompt)) return true;
+  return false;
+}
+
+export function isGenericPlaceholderPrompt(text: string): boolean {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  if (/\[card de revisão/.test(t)) return true;
+  if (/aplicações práticas essenciais/.test(t) && /aprendizado universitário/.test(t)) return true;
+  if (/\[questão de avaliação/.test(t) && /pilares fundamentais/.test(t)) return true;
   return false;
 }
 
@@ -137,6 +147,23 @@ export function isDuplicateOrHighlySimilar(newText: string, existingTexts: reado
     }
   }
 
+  return false;
+}
+
+export function isUnusableStudyCorpus(text: string): boolean {
+  if (!text || text.trim().length < 20) return true;
+  if (text.startsWith('PK') && text.includes('[Content_Types].xml')) return true;
+  if (text.includes('PK\u0003\u0004')) return true;
+  const sample = text.slice(0, 400);
+  const printable = sample.replace(/[^\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]/g, '');
+  if (printable.length / Math.max(sample.length, 1) < 0.55) return true;
+  if (/dados binários brutos|arquivo compactado \(estrutura interna/i.test(text)) return true;
+  return false;
+}
+
+export function materialHasStudyCorpus(rawContent?: string, summary?: string): boolean {
+  if (rawContent && !isUnusableStudyCorpus(rawContent)) return true;
+  if (summary && summary.trim().length >= 40 && !isUnusableStudyCorpus(summary)) return true;
   return false;
 }
 
