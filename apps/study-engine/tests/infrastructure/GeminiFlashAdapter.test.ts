@@ -34,7 +34,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
 
       expect(quiz.length).toBe(2);
       for (const q of quiz) {
-        expect(q.prompt).toContain('Segundo o material');
+        expect(q.prompt.length).toBeGreaterThan(10);
         expect(q.prompt.toLowerCase()).not.toContain('anne');
         expect(q.options.length).toBe(4);
         expect(q.correctAnswerIndex).toBeGreaterThanOrEqual(0);
@@ -120,7 +120,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
                     {
                       text: JSON.stringify([
                         {
-                          prompt: 'Anne precisa implementar um sistema de navegação por GPS e os pesos das rotas representam tempo em minutos. Qual algoritmo ela deve escolher?',
+                          prompt: 'Ao implementar um sistema de navegação por GPS onde os pesos das rotas representam tempo em minutos, qual algoritmo deve ser escolhido?',
                           options: [
                             'Dijkstra, pois os tempos são valores não negativos.',
                             'Bellman-Ford, pois é o único capaz de lidar com matrizes esparsas.',

@@ -42,6 +42,9 @@ describe('StudyCorpusSanitizer', () => {
       )
     ).toBe(true);
     expect(
+      isPedagogicallyOffTopic('Anne estuda anatomia humana no curso.')
+    ).toBe(true);
+    expect(
       isPedagogicallyOffTopic('O que caracteriza o fine-tuning supervisionado de um LLM?')
     ).toBe(false);
   });

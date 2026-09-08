@@ -12,7 +12,7 @@ export class WhisperAdapter implements ITranscriptionService {
     if (!this.apiKey) {
       // Fallback para desenvolvimento e testes
       return {
-        text: `Transcrição sintetizada para ${typeof fileUrlOrBuffer === 'string' ? fileUrlOrBuffer : 'áudio em buffer'}. Conteúdo aborda conceitos-chave para estudo universitário da Anne.`,
+        text: `Transcrição sintetizada para ${typeof fileUrlOrBuffer === 'string' ? fileUrlOrBuffer : 'áudio em buffer'}. Conteúdo aborda conceitos-chave para estudo acadêmico universitário.`,
         durationSeconds: 120,
         language: 'pt',
       };

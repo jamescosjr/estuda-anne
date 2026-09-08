@@ -4,6 +4,7 @@ import { ILanguageModelService, ContextCacheHandle } from '../../ports/ILanguage
 import {
   isDocumentMetaReferencing,
   isDuplicateOrHighlySimilar,
+  isPedagogicallyOffTopic,
 } from '../StudyCorpusSanitizer.js';
 
 export class FlashcardSpecialistAgent {
@@ -22,7 +23,7 @@ export class FlashcardSpecialistAgent {
     cacheHandle?: ContextCacheHandle | null
   ): Promise<Flashcard[]> {
     const existingMaterialCards = (await this.flashcardRepository.findByMaterialId(materialId)) || [];
-    const studentCards = (await this.flashcardRepository.findByStudentId?.(studentId, 50)) || [];
+    const studentCards = (await this.flashcardRepository.findByStudentId?.(studentId, 100)) || [];
     const existingFronts = Array.from(
       new Set([
         ...existingMaterialCards.map(c => c.front),
@@ -45,8 +46,13 @@ export class FlashcardSpecialistAgent {
         return false;
       }
 
-      // 2. Rejeita cartões duplicados ou semanticamente repetidos (> 60% Jaccard similarity)
-      if (isDuplicateOrHighlySimilar(c.front, accumulatedFronts, 0.60)) {
+      // 2. Rejeita qualquer menção a persona Anne ou assuntos fora de escopo
+      if (isPedagogicallyOffTopic(c.front) || isPedagogicallyOffTopic(c.back)) {
+        return false;
+      }
+
+      // 3. Rejeita cartões duplicados ou semanticamente repetidos (Jaccard similarity >= 0.50)
+      if (isDuplicateOrHighlySimilar(c.front, accumulatedFronts, 0.50)) {
         return false;
       }
 

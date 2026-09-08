@@ -13,6 +13,11 @@ import {
 } from '../../domain/ports/ILanguageModelService.js';
 import { env } from '../config/env.js';
 import { logStructured } from '../observability/structuredLog.js';
+import {
+  isDocumentMetaReferencing,
+  isDuplicateOrHighlySimilar,
+  isPedagogicallyOffTopic,
+} from '../../domain/services/StudyCorpusSanitizer.js';
 
 export const GEMINI_RETRY = {
   maxAttempts: 3,
@@ -310,47 +315,42 @@ ${content.slice(0, 10000)}`;
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
     options?: { cacheHandle?: ContextCacheHandle | null; keyConcepts?: readonly string[] }
   ): Promise<GeneratedFlashcardDTO[]> {
+    const existingList = (existingPrompts || []).map(p => p.trim());
+
     if (!this.apiKey) {
-      const concepts = options?.keyConcepts || [];
-      const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
+      const rawConcepts = options?.keyConcepts && options.keyConcepts.length > 0
+        ? options.keyConcepts
+        : content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15);
+
+      const distinctTopics = Array.from(new Set(rawConcepts.map(c => c.trim())))
+        .filter(t => t.length > 0 && !isPedagogicallyOffTopic(t) && !isDocumentMetaReferencing(t));
+
       const cards: GeneratedFlashcardDTO[] = [];
-      const distinctTopics = Array.from(new Set(concepts.length > 0 ? concepts : sentences));
-      const existingSet = new Set((existingPrompts || []).map(p => p.trim().toLowerCase()));
+      const seenFronts = [...existingList];
 
       const triggers = [
-        (topic: string) => `[Definição] Qual a caracterização atômica de: ${topic.slice(0, 45)}?`,
-        (topic: string) => `[Mecanismo] Como opera o processo de: ${topic.slice(0, 45)}?`,
-        (topic: string) => `[Aplicação] De que maneira o fundamento de ${topic.slice(0, 35)} se aplica na prática?`,
-        (topic: string) => `[Causa & Efeito] Qual o impacto direto de ${topic.slice(0, 35)} no resultado do sistema?`,
-        (topic: string) => `[Limitação] Qual a condição limite ou ponto crítico em relação a ${topic.slice(0, 35)}?`,
+        (t: string) => `[Definição] Qual a caracterização fundamental de: ${t.slice(0, 40)}?`,
+        (t: string) => `[Mecanismo] Como funciona o processo de: ${t.slice(0, 40)}?`,
+        (t: string) => `[Aplicação] Como o princípio de ${t.slice(0, 35)} se aplica na prática?`,
+        (t: string) => `[Causa & Efeito] Qual o impacto direto de ${t.slice(0, 35)} no sistema?`,
+        (t: string) => `[Diferenciação] Qual o ponto crítico de distinção quanto a ${t.slice(0, 35)}?`,
       ];
 
-      for (let i = 0; i < Math.min(count, Math.max(3, distinctTopics.length)); i++) {
-        const topic = distinctTopics[i] || `Conceito fundamental ${i + 1}`;
+      for (let i = 0; i < count; i++) {
+        const topic = distinctTopics[i % Math.max(1, distinctTopics.length)] || `conceito chave ${i + 1}`;
         const triggerFn = triggers[i % triggers.length];
         const front = triggerFn(topic);
-        if (existingSet.has(front.toLowerCase())) continue;
 
+        if (isDuplicateOrHighlySimilar(front, seenFronts, 0.50)) continue;
+
+        seenFronts.push(front);
         cards.push({
           front,
-          back: `Explicação do conceito chave de ${topic.slice(0, 40)}. Assegura retenção e compreensão atômica sem ambiguidades.`,
+          back: `Explicação essencial sobre ${topic.slice(0, 45)}. Garante retenção ativa do fundamento.`,
         });
       }
 
-      return cards.length > 0 ? cards : [
-        {
-          front: '[Definição] Qual a definição atômica do conceito principal da matéria?',
-          back: content.slice(0, 100).trim() + '.',
-        },
-        {
-          front: '[Mecanismo] Como aplicar este fundamento na prática acadêmica?',
-          back: 'Relacionando os axiomas teóricos com resolução ativa de problemas.',
-        },
-        {
-          front: '[Diferenciação] Qual o ponto crítico de diferenciação entre os modelos?',
-          back: 'A abrangência analítica e a eficiência no diagnóstico de resultados.',
-        },
-      ];
+      return cards;
     }
 
     const conceptsBlock = options?.keyConcepts && options.keyConcepts.length > 0
@@ -364,6 +364,8 @@ ${content.slice(0, 10000)}`;
     const focusBlock = focusTopics && focusTopics.length > 0
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% de foco) os tópicos com maior taxa de erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
+
+    let parsedCards: GeneratedFlashcardDTO[] = [];
 
     if (options?.cacheHandle?.cache) {
       const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -405,10 +407,9 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
 
       const result = await model.generateContent(prompt);
       const textOutput = result.response.text();
-      return JSON.parse(textOutput);
-    }
-
-    const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
+      parsedCards = JSON.parse(textOutput);
+    } else {
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO da matéria, nunca sobre o documento.
 
 MATRIZ DE DIVERSIDADE PEDAGÓGICA (Obrigatório distribuir os ${count} flashcards entre estes ângulos cognitivos):
@@ -440,28 +441,45 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
   }
 ]`;
 
-    const response = await geminiFetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.7,
-          },
-        }),
-      }
-    );
+      const response = await geminiFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.7,
+            },
+          }),
+        }
+      );
 
-    if (!response.ok) {
-      throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json() as any;
+      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      parsedCards = JSON.parse(textOutput);
     }
 
-    const data = await response.json() as any;
-    const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return JSON.parse(textOutput);
+    // Pós-processamento de Desduplicação e Sanitização Estrita
+    const uniqueCards: GeneratedFlashcardDTO[] = [];
+    const seenFronts = [...existingList];
+
+    for (const card of parsedCards) {
+      if (!card || !card.front || !card.back) continue;
+      if (isDocumentMetaReferencing(card.front) || isDocumentMetaReferencing(card.back)) continue;
+      if (isPedagogicallyOffTopic(card.front) || isPedagogicallyOffTopic(card.back)) continue;
+      if (isDuplicateOrHighlySimilar(card.front, seenFronts, 0.50)) continue;
+
+      seenFronts.push(card.front.trim());
+      uniqueCards.push(card);
+    }
+
+    return uniqueCards;
   }
 
   public async generateQuizQuestions(
@@ -471,28 +489,44 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
     options?: { cacheHandle?: ContextCacheHandle | null }
   ): Promise<GeneratedQuizQuestionDTO[]> {
+    const existingList = (existingPrompts || []).map(p => p.trim());
+
     if (!this.apiKey) {
-      const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 20);
+      const sentences = content.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 15 && !isPedagogicallyOffTopic(s) && !isDocumentMetaReferencing(s));
       const questions: GeneratedQuizQuestionDTO[] = [];
+      const seenPrompts = [...existingList];
+
+      const promptTemplates = [
+        (t: string) => `[Conceito] Qual a definição teórica fundamental sobre: ${t.slice(0, 40)}?`,
+        (t: string) => `[Mecanismo] Qual o modo de funcionamento do processo de: ${t.slice(0, 40)}?`,
+        (t: string) => `[Aplicação] Como o fundamento de ${t.slice(0, 35)} se aplica na resolução de problemas?`,
+        (t: string) => `[Análise] Qual o ponto crítico de diferenciação em relação a ${t.slice(0, 35)}?`,
+      ];
 
       for (let i = 0; i < questionsCount; i++) {
-        const sentence = sentences[i % sentences.length] || `tópico de aplicação acadêmica ${i + 1}`;
+        const sentence = sentences[i % Math.max(1, sentences.length)] || `conceito da matéria ${i + 1}`;
+        const templateFn = promptTemplates[i % promptTemplates.length];
+        const prompt = templateFn(sentence);
+
+        if (isDuplicateOrHighlySimilar(prompt, seenPrompts, 0.50)) continue;
+        seenPrompts.push(prompt);
+
         const targetIndex = i % 4;
-        const correctText = `A afirmação descreve um fundamento do conteúdo: ${sentence.slice(0, 40)}.`;
+        const correctText = `Definição precisa do fundamento: ${sentence.slice(0, 40)}.`;
         const distractors = [
-          `Ignorar o contexto inicial e utilizar uma aproximação empírica genérica.`,
-          `Confundir a hipótese de partida com o resultado de amostragem secundário.`,
-          `Desconsiderar as restrições operacionais e atuar apenas no escopo teórico.`,
+          `Ignorar o contexto inicial e usar uma premissa empírica desvinculada.`,
+          `Confundir o modelo teórico de partida com o resultado secundário.`,
+          `Desconsiderar as restrições conceituais e atuar sem validação.`,
         ];
 
         const optionsArr = [...distractors];
         optionsArr.splice(targetIndex, 0, correctText);
 
         questions.push({
-          prompt: `Segundo o material, o que é correto sobre: "${sentence.slice(0, 80)}"?`,
+          prompt,
           options: optionsArr,
           correctAnswerIndex: targetIndex,
-          explanation: `A alternativa correta (${String.fromCharCode(65 + targetIndex)}) aplica diretamente os princípios de ${sentence.slice(0, 30)}. As demais opções são distratoras teóricas incorretas.`,
+          explanation: `A alternativa (${String.fromCharCode(65 + targetIndex)}) aborda a essência teórica do conceito.`,
         });
       }
 
@@ -506,6 +540,8 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     const focusBlock = focusTopics && focusTopics.length > 0
       ? `\nDIRECIONAMENTO DE PESOS POR TÓPICO:\nPriorize (60% das questões) os tópicos de maior fragilidade/erro recente:\n${focusTopics.map(t => `- Tópico: ${t.topic} (Peso de prioridade: ${t.priorityWeight})`).join('\n')}\nMantenha 40% de cobertura proporcional do restante do material.\n`
       : '';
+
+    let parsedQuestions: any[] = [];
 
     if (options?.cacheHandle?.cache) {
       const genAI = new GoogleGenerativeAI(this.apiKey);
@@ -551,38 +587,9 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
 
       const result = await model.generateContent(prompt);
       const textOutput = result.response.text();
-      const parsed = JSON.parse(textOutput);
-
-      return parsed.map((item: any) => {
-        const question = {
-          prompt: item.prompt,
-          options: item.options || [],
-          correctAnswerIndex: typeof item.correctAnswerIndex === 'number' ? item.correctAnswerIndex : 0,
-          explanation: item.explanation ?? item.explicacao ?? '',
-        };
-
-        const opts = question.options;
-        if (opts.length <= 1) return question;
-
-        const correctText = opts[question.correctAnswerIndex] ?? opts[0];
-        const shuffledOptions = [...opts];
-
-        for (let i = shuffledOptions.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
-        }
-
-        const newCorrectIndex = shuffledOptions.indexOf(correctText);
-
-        return {
-          ...question,
-          options: shuffledOptions,
-          correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
-        };
-      });
-    }
-
-    const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
+      parsedQuestions = JSON.parse(textOutput);
+    } else {
+      const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
 
 REGRAS DE QUALIDADE:
 1. As perguntas devem ser curtas e instigantes.
@@ -621,30 +628,40 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
   }
 ]`;
 
-    const response = await geminiFetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            temperature: 0.6,
-          },
-        }),
-      }
-    );
+      const response = await geminiFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${this.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0.6,
+            },
+          }),
+        }
+      );
 
-    if (!response.ok) {
-      throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Gemini Flash API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json() as any;
+      const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      parsedQuestions = JSON.parse(textOutput);
     }
 
-    const data = await response.json() as any;
-    const textOutput = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    const parsed = JSON.parse(textOutput);
+    const uniqueQuestions: GeneratedQuizQuestionDTO[] = [];
+    const seenPrompts = [...existingList];
 
-    return parsed.map((item: any) => {
+    for (const item of parsedQuestions) {
+      if (!item || !item.prompt) continue;
+      if (isDocumentMetaReferencing(item.prompt) || isPedagogicallyOffTopic(item.prompt)) continue;
+      if (isDuplicateOrHighlySimilar(item.prompt, seenPrompts, 0.50)) continue;
+
+      seenPrompts.push(item.prompt.trim());
+
       const question = {
         prompt: item.prompt,
         options: item.options || [],
@@ -652,12 +669,14 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
         explanation: item.explanation ?? item.explicacao ?? '',
       };
 
-      // Aplica embaralhamento aleatório das opções para garantir distribuição equilibrada das respostas A, B, C, D
-      const options = question.options;
-      if (options.length <= 1) return question;
+      const opts = question.options;
+      if (opts.length <= 1) {
+        uniqueQuestions.push(question);
+        continue;
+      }
 
-      const correctText = options[question.correctAnswerIndex] ?? options[0];
-      const shuffledOptions = [...options];
+      const correctText = opts[question.correctAnswerIndex] ?? opts[0];
+      const shuffledOptions = [...opts];
 
       for (let i = shuffledOptions.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -666,12 +685,14 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
 
       const newCorrectIndex = shuffledOptions.indexOf(correctText);
 
-      return {
+      uniqueQuestions.push({
         ...question,
         options: shuffledOptions,
         correctAnswerIndex: newCorrectIndex >= 0 ? newCorrectIndex : 0,
-      };
-    });
+      });
+    }
+
+    return uniqueQuestions;
   }
 
   public async analyzeScheduleImageOrDocument(fileData: {

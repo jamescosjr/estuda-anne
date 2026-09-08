@@ -1,7 +1,11 @@
 import { Quiz } from '../../entities/Quiz.js';
 import { IQuizRepository } from '../../ports/IQuizRepository.js';
 import { ILanguageModelService, ContextCacheHandle } from '../../ports/ILanguageModelService.js';
-import { isPedagogicallyOffTopic } from '../StudyCorpusSanitizer.js';
+import {
+  isDocumentMetaReferencing,
+  isDuplicateOrHighlySimilar,
+  isPedagogicallyOffTopic,
+} from '../StudyCorpusSanitizer.js';
 
 export class QuizSpecialistAgent {
   constructor(
@@ -18,8 +22,14 @@ export class QuizSpecialistAgent {
     persist = true,
     cacheHandle?: ContextCacheHandle | null
   ): Promise<Quiz | null> {
-    const existingQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
-    const existingPrompts = existingQuizzes.flatMap(q => q.questions.map(item => item.prompt));
+    const existingMaterialQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
+    const studentQuizzes = (await this.quizRepository.findByStudentId?.(studentId)) || [];
+    const existingPrompts = Array.from(
+      new Set([
+        ...existingMaterialQuizzes.flatMap(q => q.questions.map(item => item.prompt)),
+        ...studentQuizzes.flatMap(q => q.questions.map(item => item.prompt)),
+      ])
+    );
 
     let quizQuestions = await this.aiService.generateQuizQuestions(
       rawText,
@@ -31,12 +41,14 @@ export class QuizSpecialistAgent {
 
     if (!quizQuestions || quizQuestions.length === 0) return null;
 
-    const seenPrompts = new Set(existingPrompts.map(p => p.trim().toLowerCase()));
+    const accumulatedPrompts = [...existingPrompts];
     quizQuestions = quizQuestions.filter(q => {
-      const norm = q.prompt.trim().toLowerCase();
-      if (seenPrompts.has(norm)) return false;
+      if (!q || !q.prompt) return false;
+      if (isDocumentMetaReferencing(q.prompt)) return false;
       if (isPedagogicallyOffTopic(q.prompt)) return false;
-      seenPrompts.add(norm);
+      if (isDuplicateOrHighlySimilar(q.prompt, accumulatedPrompts, 0.50)) return false;
+
+      accumulatedPrompts.push(q.prompt.trim());
       return true;
     });
 

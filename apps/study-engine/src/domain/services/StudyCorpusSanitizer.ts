@@ -95,7 +95,7 @@ export function isPedagogicallyOffTopic(prompt: string): boolean {
   const t = prompt.toLowerCase();
   if (isDocumentMetaReferencing(prompt)) return true;
   if (ISO_DATE.test(prompt) || PDF_DATE.test(prompt) || NODE_DATE_STR.test(prompt)) return true;
-  if (/\banne\b/.test(t) && /(precisa|deve|estudante|analisar o)/.test(t)) return true;
+  if (/\banne\b/i.test(t)) return true;
   if (/\bautor\b/.test(t) && /(pdf|documento|arquivo|metadad)/.test(t)) return true;
   return false;
 }
@@ -125,7 +125,7 @@ export function calculateJaccardSimilarity(text1: string, text2: string): number
   return unionSize > 0 ? intersectionCount / unionSize : 0;
 }
 
-export function isDuplicateOrHighlySimilar(newText: string, existingTexts: readonly string[], threshold = 0.60): boolean {
+export function isDuplicateOrHighlySimilar(newText: string, existingTexts: readonly string[], threshold = 0.50): boolean {
   if (!newText || existingTexts.length === 0) return false;
   const normNew = newText.trim().toLowerCase();
 
