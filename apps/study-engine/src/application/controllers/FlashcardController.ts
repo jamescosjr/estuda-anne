@@ -18,12 +18,16 @@ export class FlashcardController {
 
   public async getDue(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const query = GetDueFlashcardsQuerySchema.parse(request.query);
-    const cards = await this.getDueCardsUseCase.execute({
+    const { cards, subjectByMaterialId } = await this.getDueCardsUseCase.execute({
       studentId: query.studentId,
       limit: query.limit,
+      topic: query.topic,
     });
 
-    reply.status(200).send(cards.map(card => card.toJSON()));
+    reply.status(200).send(cards.map((card) => ({
+      ...card.toJSON(),
+      subject: subjectByMaterialId[card.materialId] || card.tags[0] || 'Conceito',
+    })));
   }
 
   public async review(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -61,7 +65,10 @@ export class FlashcardController {
       weakTopics: result.weakTopics,
       adaptiveHint: result.adaptiveHint,
       newCardIds: result.newCardIds,
-      flashcards: result.flashcards.map((f) => f.toJSON()),
+      flashcards: result.flashcards.map((f) => ({
+        ...f.toJSON(),
+        subject: f.tags[0] || 'Conceito',
+      })),
     });
   }
 }

@@ -9,7 +9,7 @@ import {
 import { IStudentAdaptiveProfileRepository } from './EvaluateQuizUseCase.js';
 import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
-import { composeAdaptiveSession, materialMatchesTopic } from '../services/FlashcardStudySession.js';
+import { cardMatchesSubject, composeAdaptiveSession, materialMatchesTopic } from '../services/FlashcardStudySession.js';
 import { materialHasStudyCorpus } from '../services/StudyCorpusSanitizer.js';
 import { UnprocessableError } from '../errors/DomainError.js';
 import {
@@ -115,7 +115,7 @@ export class GenerateExtraSessionUseCase {
           material.id,
           studentId,
           material.rawContent || material.summary || material.title,
-          material.keyConcepts,
+          [material.subject, ...material.keyConcepts].filter((item): item is string => Boolean(item)),
           focusTopics,
           true,
           undefined,
@@ -148,9 +148,15 @@ export class GenerateExtraSessionUseCase {
 
     const dueCards = await this.flashcardRepository.findDueCards(studentId, new Date(), count * 3);
     const bankCards = (await this.flashcardRepository.findByStudentId(studentId, 200)) || [];
+    const materialById = new Map(
+      (targetMaterials || []).map((material) => [material.id, material] as const)
+    );
+    const scopedPool = [...dueCards, ...bankCards].filter((card) =>
+      cardMatchesSubject(card, materialById.get(card.materialId), topic)
+    );
     const mixed = composeAdaptiveSession({
       newCards: generatedFlashcards,
-      dueCards: [...dueCards, ...bankCards],
+      dueCards: scopedPool,
       count,
       excludeIds: input.excludeIds,
     });

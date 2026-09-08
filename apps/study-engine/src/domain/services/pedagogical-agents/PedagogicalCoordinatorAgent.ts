@@ -65,7 +65,7 @@ export class PedagogicalCoordinatorAgent {
           material.id,
           material.studentId,
           studyText,
-          analysis.keyConcepts,
+          [material.subject, ...analysis.keyConcepts].filter((item): item is string => Boolean(item)),
           focusTopics,
           false,
           cacheHandle,

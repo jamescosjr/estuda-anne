@@ -3,6 +3,8 @@ import { Flashcard } from '../../src/domain/entities/Flashcard.js';
 import {
   composeAdaptiveSession,
   interleaveByKey,
+  materialBelongsToSubject,
+  cardMatchesSubject,
   materialMatchesTopic,
   uniqueByExactFront,
 } from '../../src/domain/services/FlashcardStudySession.js';
@@ -74,6 +76,29 @@ describe('FlashcardStudySession', () => {
       materialMatchesTopic(
         { title: 'Calculo I', keyConcepts: ['derivada'] },
         'Fundamentos de IA e LLMs para Programadores'
+      )
+    ).toBe(false);
+  });
+
+  it('associa card a materia do perfil, nao ao primeiro conceito da tag', () => {
+    expect(
+      materialBelongsToSubject(
+        { title: 'Apostila semana 3', subject: 'Direito Penal' },
+        'Direito Penal'
+      )
+    ).toBe(true);
+    expect(
+      cardMatchesSubject(
+        { tags: ['Dolo'] },
+        { title: 'Apostila semana 3', subject: 'Direito Penal' },
+        'Direito Penal'
+      )
+    ).toBe(true);
+    expect(
+      cardMatchesSubject(
+        { tags: ['Culpa'] },
+        { title: 'Apostila Civil', subject: 'Direito Civil' },
+        'Direito Penal'
       )
     ).toBe(false);
   });

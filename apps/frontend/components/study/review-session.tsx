@@ -72,8 +72,10 @@ export function ReviewSession() {
       if (!studentId) return
       setLoadError(null)
       try {
+        const params = new URLSearchParams({ studentId })
+        if (subjectFilter !== 'all') params.set('topic', subjectFilter)
         const { ok, data } = await fetchJson<any[]>(
-          `${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`,
+          `${bffUrl}/api/flashcards/due?${params.toString()}`,
         )
         if (ok && Array.isArray(data) && data.length > 0) {
           const seen = new Set(readSeenCardIds())
@@ -84,13 +86,9 @@ export function ReviewSession() {
             const unseen = mapped.filter((card) => !seen.has(card.id))
             const rest = mapped.filter((card) => seen.has(card.id))
             const ordered = [...unseen, ...rest]
-            const filtered = subjectFilter === 'all'
-              ? ordered
-              : ordered.filter((c) => c.subject.toLowerCase().includes(subjectFilter.toLowerCase()))
-            const pool = filtered.length > 0 ? filtered : ordered
             setPersistedPool(mapped)
-            setCards(pool.slice(0, targetCount))
-            rememberSeenCardIds(pool.slice(0, targetCount).map((card) => card.id))
+            setCards(ordered.slice(0, targetCount))
+            rememberSeenCardIds(ordered.slice(0, targetCount).map((card) => card.id))
             setUsingDemo(false)
             setAdaptiveHint(null)
             setSessionMeta(null)

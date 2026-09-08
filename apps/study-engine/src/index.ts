@@ -156,7 +156,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       contentExtractor
     );
     const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo, profileRepo);
-    const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo);
+    const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo, materialRepo);
     const generateScheduleUseCase = new GenerateStudyScheduleUseCase(
       scheduleRepo,
       materialRepo,

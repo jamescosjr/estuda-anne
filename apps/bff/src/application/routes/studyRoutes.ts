@@ -200,10 +200,13 @@ export async function studyRoutes(app: FastifyInstance) {
 
   // Rota para consultar Flashcards Pendentes de Revisão Espaçada
   app.get('/api/flashcards/due', async (request, reply) => {
-    const { studentId = 'anne-student-1' } = request.query as any;
+    const { studentId = 'anne-student-1', topic } = request.query as any;
 
     try {
-      const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/due?studentId=${encodeURIComponent(studentId)}`);
+      const dueUrl = new URL(`${STUDY_ENGINE_URL}/flashcards/due`);
+      dueUrl.searchParams.set('studentId', studentId);
+      if (topic && topic !== 'all') dueUrl.searchParams.set('topic', String(topic));
+      const res = await fetch(dueUrl);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao listar flashcards' }));
         return reply.status(res.status).send(errJson);

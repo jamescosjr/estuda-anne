@@ -91,15 +91,52 @@ export function composeAdaptiveSession(input: ComposeAdaptiveSessionInput): Comp
   };
 }
 
+function normalizeSubjectLabel(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function materialBelongsToSubject(
+  material: { title: string; subject?: string } | undefined,
+  topic?: string
+): boolean {
+  if (!topic || topic.trim() === '' || topic === 'all') return true;
+  if (!material) return false;
+  const needle = normalizeSubjectLabel(topic);
+  const subject = normalizeSubjectLabel(material.subject || '');
+  const title = normalizeSubjectLabel(material.title || '');
+  if (subject && (subject === needle || subject.includes(needle) || needle.includes(subject))) {
+    return true;
+  }
+  if (title && (title === needle || title.includes(needle) || needle.includes(title))) {
+    return true;
+  }
+  return false;
+}
+
+export function cardMatchesSubject(
+  card: { tags: readonly string[] },
+  material: { title: string; subject?: string } | undefined,
+  topic?: string
+): boolean {
+  if (!topic || topic.trim() === '' || topic === 'all') return true;
+  if (material) return materialBelongsToSubject(material, topic);
+  const needle = normalizeSubjectLabel(topic);
+  return card.tags.some((tag) => {
+    const label = normalizeSubjectLabel(tag);
+    return label === needle || label.includes(needle) || needle.includes(label);
+  });
+}
+
 export function materialMatchesTopic(
   material: { title: string; subject?: string; keyConcepts: readonly string[] },
   topic?: string
 ): boolean {
   if (!topic || topic.trim() === '' || topic === 'all') return true;
-  const needle = topic.trim().toLowerCase();
+  if (materialBelongsToSubject(material, topic)) return true;
+  const needle = normalizeSubjectLabel(topic);
   const haystack = [material.title, material.subject, ...material.keyConcepts]
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
-  return haystack.includes(needle) || needle.includes(material.title.toLowerCase());
+  return haystack.includes(needle) || needle.includes(normalizeSubjectLabel(material.title));
 }

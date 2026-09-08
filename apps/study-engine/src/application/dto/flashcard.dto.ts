@@ -35,6 +35,7 @@ export type ReviewFlashcardBodyDTO = z.infer<typeof ReviewFlashcardBodySchema>;
 export const GetDueFlashcardsQuerySchema = z.object({
   studentId: z.string().min(1),
   limit: z.coerce.number().positive().max(100).optional().default(50),
+  topic: z.string().optional(),
 });
 
 export const ExtraSessionBodySchema = z.object({
