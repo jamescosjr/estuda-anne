@@ -12,6 +12,7 @@ export interface GetQuizSessionInput {
   studentId: string;
   count?: number;
   topic?: string;
+  allowedSubjects?: string[];
   excludeIds?: string[];
 }
 
@@ -38,7 +39,7 @@ export class GetQuizSessionUseCase {
     const quizzes = (await this.quizRepository.findByStudentId(input.studentId)) || [];
     const bank = flattenQuizzes(quizzes).filter(
       (item) =>
-        questionMatchesTopic(item, input.topic) &&
+        questionMatchesTopic(item, input.topic, input.allowedSubjects) &&
         !isGenericPlaceholderPrompt(item.prompt) &&
         !isPedagogicallyOffTopic(item.prompt)
     );

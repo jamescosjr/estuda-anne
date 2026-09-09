@@ -95,11 +95,34 @@ function normalizeSubjectLabel(value: string): string {
   return value.trim().toLowerCase();
 }
 
+export function isSubjectAllowed(subjectOrTitle: string, allowedSubjects?: string[]): boolean {
+  if (!allowedSubjects || allowedSubjects.length === 0) return true;
+  const normalizedLabel = normalizeSubjectLabel(subjectOrTitle);
+  return allowedSubjects.some((allowed) => {
+    const normAllowed = normalizeSubjectLabel(allowed);
+    return (
+      normalizedLabel === normAllowed ||
+      normalizedLabel.includes(normAllowed) ||
+      normAllowed.includes(normalizedLabel)
+    );
+  });
+}
+
 export function materialBelongsToSubject(
   material: { title: string; subject?: string } | undefined,
-  topic?: string
+  topic?: string,
+  allowedSubjects?: string[]
 ): boolean {
-  if (!topic || topic.trim() === '' || topic === 'all') return true;
+  if (allowedSubjects && allowedSubjects.length > 0 && material) {
+    const matSubject = material.subject || material.title || '';
+    if (!isSubjectAllowed(matSubject, allowedSubjects) && !isSubjectAllowed(material.title || '', allowedSubjects)) {
+      return false;
+    }
+  }
+
+  if (!topic || topic.trim() === '' || topic === 'all') {
+    return allowedSubjects && allowedSubjects.length > 0 ? Boolean(material) : true;
+  }
   if (!material) return false;
   const needle = normalizeSubjectLabel(topic);
   const subject = normalizeSubjectLabel(material.subject || '');
@@ -116,10 +139,19 @@ export function materialBelongsToSubject(
 export function cardMatchesSubject(
   card: { tags: readonly string[] },
   material: { title: string; subject?: string } | undefined,
-  topic?: string
+  topic?: string,
+  allowedSubjects?: string[]
 ): boolean {
+  if (material) {
+    return materialBelongsToSubject(material, topic, allowedSubjects);
+  }
+
+  if (allowedSubjects && allowedSubjects.length > 0) {
+    const isAllowed = card.tags.some((tag) => isSubjectAllowed(tag, allowedSubjects));
+    if (!isAllowed) return false;
+  }
+
   if (!topic || topic.trim() === '' || topic === 'all') return true;
-  if (material) return materialBelongsToSubject(material, topic);
   const needle = normalizeSubjectLabel(topic);
   return card.tags.some((tag) => {
     const label = normalizeSubjectLabel(tag);
@@ -129,10 +161,18 @@ export function cardMatchesSubject(
 
 export function materialMatchesTopic(
   material: { title: string; subject?: string; keyConcepts: readonly string[] },
-  topic?: string
+  topic?: string,
+  allowedSubjects?: string[]
 ): boolean {
+  if (allowedSubjects && allowedSubjects.length > 0) {
+    const matSubject = material.subject || material.title || '';
+    if (!isSubjectAllowed(matSubject, allowedSubjects) && !isSubjectAllowed(material.title || '', allowedSubjects)) {
+      return false;
+    }
+  }
+
   if (!topic || topic.trim() === '' || topic === 'all') return true;
-  if (materialBelongsToSubject(material, topic)) return true;
+  if (materialBelongsToSubject(material, topic, allowedSubjects)) return true;
   const needle = normalizeSubjectLabel(topic);
   const haystack = [material.title, material.subject, ...material.keyConcepts]
     .filter(Boolean)
@@ -140,3 +180,4 @@ export function materialMatchesTopic(
     .toLowerCase();
   return haystack.includes(needle) || needle.includes(normalizeSubjectLabel(material.title));
 }
+

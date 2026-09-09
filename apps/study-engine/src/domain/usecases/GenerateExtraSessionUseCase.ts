@@ -23,6 +23,7 @@ export interface GenerateExtraSessionInput {
   studentId: string;
   materialId?: string;
   topic?: string;
+  allowedSubjects?: string[];
   count?: number;
   excludeIds?: string[];
   targetType?: 'flashcards' | 'quiz' | 'both';
@@ -59,7 +60,7 @@ export class GenerateExtraSessionUseCase {
   }
 
   public async execute(input: GenerateExtraSessionInput): Promise<GenerateExtraSessionOutput> {
-    const { studentId, materialId, topic, targetType = 'both' } = input;
+    const { studentId, materialId, topic, allowedSubjects, targetType = 'both' } = input;
     const count = Math.min(20, Math.max(5, input.count ?? 8));
 
     let targetMaterials = [];
@@ -70,10 +71,10 @@ export class GenerateExtraSessionUseCase {
       targetMaterials = (await this.materialRepository.findByStudentId(studentId)) || [];
     }
 
-    const matching = targetMaterials.filter((material) => materialMatchesTopic(material, topic));
-    const selected = (matching.length > 0 ? matching : targetMaterials).filter((material) =>
-      materialHasStudyCorpus(material.rawContent, material.summary)
-    );
+    const matching = targetMaterials.filter((material) => materialMatchesTopic(material, topic, allowedSubjects));
+    const selected = (matching.length > 0 ? matching : targetMaterials)
+      .filter((material) => materialMatchesTopic(material, undefined, allowedSubjects))
+      .filter((material) => materialHasStudyCorpus(material.rawContent, material.summary));
 
     if (targetMaterials.length === 0) {
       throw new UnprocessableError('Nenhum material cadastrado encontrado para gerar a sessão extra de estudos.');
@@ -152,7 +153,7 @@ export class GenerateExtraSessionUseCase {
       (targetMaterials || []).map((material) => [material.id, material] as const)
     );
     const scopedPool = [...dueCards, ...bankCards].filter((card) =>
-      cardMatchesSubject(card, materialById.get(card.materialId), topic)
+      cardMatchesSubject(card, materialById.get(card.materialId), topic, allowedSubjects)
     );
     const mixed = composeAdaptiveSession({
       newCards: generatedFlashcards,
@@ -167,7 +168,7 @@ export class GenerateExtraSessionUseCase {
     const generatedQuizIds = new Set(generatedQuizzes.map((quiz) => quiz.id));
     const bankQuestions = flattenQuizzes(existingQuizzes)
       .filter((item) => !generatedQuizIds.has(item.quizId))
-      .filter((item) => questionMatchesTopic(item, topic));
+      .filter((item) => questionMatchesTopic(item, topic, allowedSubjects));
     const newQuestions = flattenQuizzes(generatedQuizzes);
     const quizMixed = composeQuizSession({
       newQuestions,

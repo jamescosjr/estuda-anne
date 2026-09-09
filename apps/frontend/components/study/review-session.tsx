@@ -74,6 +74,7 @@ export function ReviewSession() {
       try {
         const params = new URLSearchParams({ studentId })
         if (subjectFilter !== 'all') params.set('topic', subjectFilter)
+        if (availableSubjects.length > 0) params.set('allowedSubjects', availableSubjects.join(','))
         const { ok, data } = await fetchJson<any[]>(
           `${bffUrl}/api/flashcards/due?${params.toString()}`,
         )
@@ -145,6 +146,7 @@ export function ReviewSession() {
         body: JSON.stringify({
           studentId,
           topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+          allowedSubjects: availableSubjects,
           count: targetCount,
           excludeIds: readSeenCardIds(),
         }),

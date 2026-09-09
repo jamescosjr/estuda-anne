@@ -101,4 +101,55 @@ describe('GetDueFlashcardsUseCase', () => {
     const allSubjects = await useCase.execute({ studentId: 'lais', limit: 20 });
     expect(allSubjects.cards).toHaveLength(3);
   });
+
+  it('descarta flashcards de materias fora de allowedSubjects (ex: Calculo 1 da aluna Lais)', async () => {
+    const calculo = Flashcard.create({
+      studentId: 'lais',
+      materialId: 'mat-calc',
+      front: 'Qual a derivada de x^2?',
+      back: '2x',
+      tags: ['Cálculo 1'],
+    });
+    const anatomia = Flashcard.create({
+      studentId: 'lais',
+      materialId: 'mat-anat',
+      front: 'Quais os ossos do antebraço?',
+      back: 'Rádio e Ulna',
+      tags: ['Anatomia'],
+    });
+
+    const useCase = new GetDueFlashcardsUseCase(
+      {
+        save: vi.fn(),
+        saveMany: vi.fn(),
+        findById: vi.fn(),
+        findByStudentId: vi.fn().mockResolvedValue([calculo, anatomia]),
+        findDueCards: vi.fn().mockResolvedValue([calculo, anatomia]),
+        findByMaterialId: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        deleteByStudentId: vi.fn(),
+      },
+      {
+        save: vi.fn(),
+        findById: vi.fn(),
+        findByStudentId: vi.fn().mockResolvedValue([
+          { id: 'mat-calc', title: 'Limites e Derivadas', subject: 'Cálculo 1', keyConcepts: ['Derivadas'] },
+          { id: 'mat-anat', title: 'Sistema Esquelético', subject: 'Anatomia', keyConcepts: ['Ossos'] },
+        ]),
+        update: vi.fn(),
+        delete: vi.fn(),
+        deleteManyByIds: vi.fn(),
+      } as any
+    );
+
+    const result = await useCase.execute({
+      studentId: 'lais',
+      allowedSubjects: ['Anatomia', 'Fisiologia'],
+    });
+
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].front).toContain('antebraço');
+    expect(result.cards.some((c) => c.front.includes('derivada'))).toBe(false);
+  });
 });

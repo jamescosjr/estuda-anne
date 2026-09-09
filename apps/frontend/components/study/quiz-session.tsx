@@ -108,6 +108,7 @@ export function QuizSession() {
           count: String(targetCount),
         })
         if (topic) params.set('topic', topic)
+        if (availableSubjects.length > 0) params.set('allowedSubjects', availableSubjects.join(','))
         const { ok, data } = await fetchJson<{
           questions?: any[]
           adaptiveHint?: string
@@ -163,6 +164,7 @@ export function QuizSession() {
         body: JSON.stringify({
           studentId: user?.id,
           topic: subjectFilter !== 'all' ? subjectFilter : undefined,
+          allowedSubjects: availableSubjects,
           count: targetCount,
           excludeIds: [...readSeenQuizIds()],
         }),

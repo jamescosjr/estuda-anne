@@ -13,6 +13,7 @@ export interface GetDueFlashcardsInput {
   asOfDate?: Date;
   limit?: number;
   topic?: string;
+  allowedSubjects?: string[];
 }
 
 export interface GetDueFlashcardsOutput {
@@ -43,7 +44,7 @@ export class GetDueFlashcardsUseCase {
     }
 
     const matchesTopic = (card: Flashcard) =>
-      cardMatchesSubject(card, materialById.get(card.materialId), input.topic);
+      cardMatchesSubject(card, materialById.get(card.materialId), input.topic, input.allowedSubjects);
 
     const due = await this.flashcardRepository.findDueCards(input.studentId, targetDate, limit);
     const usableDue = uniqueByExactFront(due)

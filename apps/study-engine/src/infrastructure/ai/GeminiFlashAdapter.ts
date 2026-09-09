@@ -703,17 +703,16 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     if (!this.apiKey) {
       // Fallback inteligente para desenvolvimento/offline
       const text = fileData.textContent || '';
+      const fallbackSubject = text.trim().slice(0, 30) || 'Matéria Principal';
       return {
         periodStartDate: new Date().toISOString().split('T')[0],
         periodEndDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        subjects: ['Cálculo I', 'Algoritmos e Estruturas de Dados', 'Engenharia de Software'],
+        subjects: [fallbackSubject],
         examDates: [
-          { subject: 'Cálculo I', title: 'Prova P1 (Derivadas)', date: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
-          { subject: 'Algoritmos e Estruturas de Dados', title: 'Trabalho Prático 1', date: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
+          { subject: fallbackSubject, title: 'Avaliação Principal', date: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] },
         ],
         suggestedScheduleEvents: [
-          { day: 'Seg', date: 'Segunda', title: 'Revisão espaçada — Cálculo I', subject: 'Cálculo I', type: 'flashcards', time: '18:00' },
-          { day: 'Ter', date: 'Terça', title: 'Quiz — Algoritmos', subject: 'Algoritmos e Estruturas de Dados', type: 'quiz', time: '19:30' },
+          { day: 'Seg', date: 'Segunda', title: `Revisão espaçada — ${fallbackSubject}`, subject: fallbackSubject, type: 'flashcards', time: '18:00' },
         ],
       };
     }

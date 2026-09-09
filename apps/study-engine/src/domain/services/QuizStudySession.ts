@@ -1,5 +1,5 @@
 import { Quiz, QuizQuestion } from '../entities/Quiz.js';
-import { interleaveByKey } from './FlashcardStudySession.js';
+import { interleaveByKey, isSubjectAllowed } from './FlashcardStudySession.js';
 
 export interface QuizBankItem extends QuizQuestion {
   quizId: string;
@@ -28,7 +28,17 @@ export function flattenQuizzes(quizzes: Quiz[]): QuizBankItem[] {
   return items;
 }
 
-export function questionMatchesTopic(item: QuizBankItem, topic?: string): boolean {
+export function questionMatchesTopic(
+  item: QuizBankItem,
+  topic?: string,
+  allowedSubjects?: string[]
+): boolean {
+  if (allowedSubjects && allowedSubjects.length > 0) {
+    if (!isSubjectAllowed(item.subject, allowedSubjects)) {
+      return false;
+    }
+  }
+
   if (!topic || topic.trim() === '' || topic === 'all') return true;
   const needle = topic.trim().toLowerCase();
   const haystack = `${item.subject} ${item.prompt}`.toLowerCase();

@@ -32,17 +32,38 @@ export const ReviewFlashcardBodySchema = z
 
 export type ReviewFlashcardBodyDTO = z.infer<typeof ReviewFlashcardBodySchema>;
 
-export const GetDueFlashcardsQuerySchema = z.object({
-  studentId: z.string().min(1),
-  limit: z.coerce.number().positive().max(100).optional().default(50),
-  topic: z.string().optional(),
-});
+const allowedSubjectsSchema = z
+  .union([
+    z.array(z.string()),
+    z.string().transform((val) => val.split(',').map((s) => s.trim()).filter(Boolean)),
+  ])
+  .optional();
 
-export const ExtraSessionBodySchema = z.object({
-  studentId: z.string().min(1),
-  materialId: z.string().optional(),
-  topic: z.string().optional(),
-  subjectId: z.string().optional(),
-  count: z.coerce.number().int().min(3).max(20).optional(),
-  excludeIds: z.array(z.string()).optional(),
-});
+export const GetDueFlashcardsQuerySchema = z
+  .object({
+    studentId: z.string().min(1),
+    limit: z.coerce.number().positive().max(100).optional().default(50),
+    topic: z.string().optional(),
+    allowedSubjects: allowedSubjectsSchema,
+    subjects: allowedSubjectsSchema,
+  })
+  .transform((data) => ({
+    ...data,
+    allowedSubjects: data.allowedSubjects ?? data.subjects,
+  }));
+
+export const ExtraSessionBodySchema = z
+  .object({
+    studentId: z.string().min(1),
+    materialId: z.string().optional(),
+    topic: z.string().optional(),
+    subjectId: z.string().optional(),
+    allowedSubjects: allowedSubjectsSchema,
+    subjects: allowedSubjectsSchema,
+    count: z.coerce.number().int().min(3).max(20).optional(),
+    excludeIds: z.array(z.string()).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    allowedSubjects: data.allowedSubjects ?? data.subjects,
+  }));

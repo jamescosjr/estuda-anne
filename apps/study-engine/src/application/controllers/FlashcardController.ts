@@ -22,6 +22,7 @@ export class FlashcardController {
       studentId: query.studentId,
       limit: query.limit,
       topic: query.topic,
+      allowedSubjects: query.allowedSubjects,
     });
 
     reply.status(200).send(cards.map((card) => ({
@@ -53,6 +54,7 @@ export class FlashcardController {
       studentId: body.studentId,
       materialId: body.materialId,
       topic: body.topic || body.subjectId,
+      allowedSubjects: body.allowedSubjects,
       count: body.count,
       excludeIds: body.excludeIds,
       targetType: 'flashcards',

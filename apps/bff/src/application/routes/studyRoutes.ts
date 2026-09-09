@@ -200,12 +200,17 @@ export async function studyRoutes(app: FastifyInstance) {
 
   // Rota para consultar Flashcards Pendentes de Revisão Espaçada
   app.get('/api/flashcards/due', async (request, reply) => {
-    const { studentId = 'anne-student-1', topic } = request.query as any;
+    const { studentId = 'anne-student-1', topic, allowedSubjects, subjects } = request.query as any;
+    const activeSubjects = allowedSubjects || subjects;
 
     try {
       const dueUrl = new URL(`${STUDY_ENGINE_URL}/flashcards/due`);
       dueUrl.searchParams.set('studentId', studentId);
       if (topic && topic !== 'all') dueUrl.searchParams.set('topic', String(topic));
+      if (activeSubjects) {
+        const value = Array.isArray(activeSubjects) ? activeSubjects.join(',') : String(activeSubjects);
+        if (value) dueUrl.searchParams.set('allowedSubjects', value);
+      }
       const res = await fetch(dueUrl);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao listar flashcards' }));
@@ -243,13 +248,14 @@ export async function studyRoutes(app: FastifyInstance) {
 
   // Rota para Gerar Sessão Extra de Flashcards (reavalia perfil e gera novos flashcards persistidos)
   app.post('/api/flashcards/extra-session', async (request, reply) => {
-    const { studentId = 'anne-student-1', subjectId, topic, count, excludeIds } = (request.body as any) || {};
+    const { studentId = 'anne-student-1', subjectId, topic, allowedSubjects, subjects, count, excludeIds } = (request.body as any) || {};
+    const activeSubjects = allowedSubjects || subjects;
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
+        body: JSON.stringify({ studentId, subjectId, topic, allowedSubjects: activeSubjects, count, excludeIds }),
         signal: AbortSignal.timeout(180_000),
       });
 
@@ -595,11 +601,17 @@ REGRAS RÍGIDAS:
   });
 
   app.get('/api/quizzes/session', async (request, reply) => {
-    const { studentId = 'anne-student-1', topic, count } = request.query as any;
+    const { studentId = 'anne-student-1', topic, allowedSubjects, subjects, count } = request.query as any;
+    const activeSubjects = allowedSubjects || subjects;
+
     try {
       const params = new URLSearchParams({ studentId: String(studentId) });
       if (topic) params.set('topic', String(topic));
       if (count) params.set('count', String(count));
+      if (activeSubjects) {
+        const value = Array.isArray(activeSubjects) ? activeSubjects.join(',') : String(activeSubjects);
+        if (value) params.set('allowedSubjects', value);
+      }
       const res = await fetch(`${STUDY_ENGINE_URL}/quizzes/session?${params.toString()}`);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao montar sessão de quiz' }));
@@ -660,13 +672,14 @@ REGRAS RÍGIDAS:
 
   // Rota para Gerar Sessão Extra de Quizzes (reavalia perfil e gera novas questões direcionadas)
   app.post('/api/quizzes/extra-session', async (request, reply) => {
-    const { studentId = 'anne-student-1', subjectId, topic, count, excludeIds } = (request.body as any) || {};
+    const { studentId = 'anne-student-1', subjectId, topic, allowedSubjects, subjects, count, excludeIds } = (request.body as any) || {};
+    const activeSubjects = allowedSubjects || subjects;
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/quizzes/extra-session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentId, subjectId, topic, count, excludeIds }),
+        body: JSON.stringify({ studentId, subjectId, topic, allowedSubjects: activeSubjects, count, excludeIds }),
         signal: AbortSignal.timeout(180_000),
       });
 

@@ -18,20 +18,41 @@ const EvaluateQuizParamsSchema = z.object({
   id: z.string().min(1),
 });
 
-const ExtraSessionBodySchema = z.object({
-  studentId: z.string().min(1),
-  materialId: z.string().optional(),
-  topic: z.string().optional(),
-  subjectId: z.string().optional(),
-  count: z.coerce.number().int().min(3).max(20).optional(),
-  excludeIds: z.array(z.string()).optional(),
-});
+const allowedSubjectsSchema = z
+  .union([
+    z.array(z.string()),
+    z.string().transform((val) => val.split(',').map((s) => s.trim()).filter(Boolean)),
+  ])
+  .optional();
 
-const QuizSessionQuerySchema = z.object({
-  studentId: z.string().min(1),
-  topic: z.string().optional(),
-  count: z.coerce.number().int().min(3).max(20).optional(),
-});
+const ExtraSessionBodySchema = z
+  .object({
+    studentId: z.string().min(1),
+    materialId: z.string().optional(),
+    topic: z.string().optional(),
+    subjectId: z.string().optional(),
+    allowedSubjects: allowedSubjectsSchema,
+    subjects: allowedSubjectsSchema,
+    count: z.coerce.number().int().min(3).max(20).optional(),
+    excludeIds: z.array(z.string()).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    allowedSubjects: data.allowedSubjects ?? data.subjects,
+  }));
+
+const QuizSessionQuerySchema = z
+  .object({
+    studentId: z.string().min(1),
+    topic: z.string().optional(),
+    allowedSubjects: allowedSubjectsSchema,
+    subjects: allowedSubjectsSchema,
+    count: z.coerce.number().int().min(3).max(20).optional(),
+  })
+  .transform((data) => ({
+    ...data,
+    allowedSubjects: data.allowedSubjects ?? data.subjects,
+  }));
 
 export class QuizController {
   constructor(
@@ -61,6 +82,7 @@ export class QuizController {
     const result = await this.getQuizSessionUseCase.execute({
       studentId: query.studentId,
       topic: query.topic,
+      allowedSubjects: query.allowedSubjects,
       count: query.count,
     });
 
@@ -89,6 +111,7 @@ export class QuizController {
       studentId: body.studentId,
       materialId: body.materialId,
       topic: body.topic || body.subjectId,
+      allowedSubjects: body.allowedSubjects,
       count: body.count,
       excludeIds: body.excludeIds,
       targetType: 'quiz',
