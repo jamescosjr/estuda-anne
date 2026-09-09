@@ -522,10 +522,14 @@ export async function studyRoutes(app: FastifyInstance) {
     const context = DailyBriefingListener.getContext(studentId);
     const studentName = name || context?.studentName || 'Estudante';
 
-    if (studentSubjects.length > 0) {
-      events = studentSubjects.map((s) => `Revisão de ${s}`);
-    } else if (context?.todayEvents && context.todayEvents.length > 0) {
-      events = context.todayEvents.filter((e) => !e.includes('Cálculo') && !e.includes('Algoritmos'));
+    const activeSubjects = studentSubjects.length > 0
+      ? studentSubjects
+      : (context?.subjects || []);
+
+    if (activeSubjects.length > 0) {
+      events = activeSubjects.map((s) => `Revisão de ${s}`);
+    } else {
+      events = [];
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -545,19 +549,19 @@ DADOS REAIS DA ESTUDANTE:
 
 REGRAS RÍGIDAS:
 - Mencione APENAS as matérias listadas acima (${events.join(', ')}).
-- NUNCA mencione Cálculo I, Algoritmos ou matérias que não estejam na lista acima.
+- NUNCA mencione matérias que não estejam na lista acima (como Cálculo I, Algoritmos, Fundamentos de IA, LLMs para Programadores, etc.).
 - Destaque o estudo ativo e a retenção em blocos curtos.`
             : `Você é um mentor universitário especialista e empático para a pessoa estudante ${studentName}.
 Gere um briefing matinal curto (máximo 2 a 3 frases) de boas-vindas para o dashboard de estudos.
 
 DADOS REAIS DA ESTUDANTE:
 - Nome: ${studentName}
-- O(a) estudante ainda não cadastrou materiais nem possui flashcards pendentes hoje.
+- O(a) estudante ainda não cadastrou materiais nem possui matérias ativas cadastradas.
 
 REGRAS RÍGIDAS:
 - Dê boas-vindas calorosas e encorajadoras.
 - Convide o(a) estudante a fazer o upload do seu primeiro material de estudo (PDF, anotação ou resumo) para gerar flashcards e conteúdos inteligentes.
-- NUNCA mencione matérias fictícias (como Cálculo I, Algoritmos, etc.).`;
+- NUNCA mencione matérias fictícias (como Cálculo I, Algoritmos, Fundamentos de IA, LLMs para Programadores, etc.).`;
 
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,

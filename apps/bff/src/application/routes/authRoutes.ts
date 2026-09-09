@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { DomainEventBus } from '../../domain/events/DomainEventBus.js';
 import { UserLoggedInEvent } from '../../domain/events/UserLoggedInEvent.js';
+import { UserProfileUpdatedEvent } from '../../domain/events/UserProfileUpdatedEvent.js';
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || 'http://127.0.0.1:3005';
 
@@ -51,7 +52,19 @@ export async function authRoutes(app: FastifyInstance) {
         body: JSON.stringify(request.body),
       });
 
-      const data = await res.json();
+      const data = await res.json() as any;
+
+      if (res.ok && data) {
+        DomainEventBus.getInstance().publish(
+          new UserProfileUpdatedEvent({
+            userId: data.id || data.userId || 'anne-student-1',
+            studentName: data.name || 'Estudante',
+            email: data.email || '',
+            subjects: data.subjects || [],
+          })
+        ).catch((err) => app.log.error({ err }, 'Erro ao publicar UserProfileUpdatedEvent'));
+      }
+
       return reply.status(res.status).send(data);
     } catch (err: any) {
       app.log.error({ err }, 'Erro ao atualizar perfil no Auth Service');
