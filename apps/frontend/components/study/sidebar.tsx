@@ -68,13 +68,13 @@ export function Sidebar({ active, onSelect, collapsed, onToggle }: SidebarProps)
       )}
     >
       <div className="flex h-16 items-center gap-2.5 px-4">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sidebar-primary text-sidebar-primary-foreground">
-          <GraduationCap className="size-5" />
+        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-sidebar-primary/10 border border-sidebar-primary/20">
+          <img src="/anne-shield-icon.jpg" alt="Anne Logo" className="size-full object-cover" />
         </div>
         {!collapsed && (
           <div className="min-w-0">
-            <p className="truncate font-display text-sm font-semibold leading-tight">Estuda Anne</p>
-            <p className="truncate text-xs text-muted-foreground">Assistente de estudos</p>
+            <p className="truncate font-display text-sm font-semibold leading-tight text-sidebar-foreground">Estuda Anne</p>
+            <p className="truncate text-xs text-muted-foreground">Assistente de estudos com IA</p>
           </div>
         )}
       </div>

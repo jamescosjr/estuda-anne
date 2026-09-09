@@ -107,25 +107,32 @@ export function QuizCard({ question, index, total, onNext, isLast }: QuizCardPro
           <div className="mt-5 flex flex-col gap-3">
             <div
               className={cn(
-                'rounded-xl border p-4',
+                'flex gap-4 items-start rounded-xl border p-4 shadow-sm',
                 isCorrect
                   ? 'border-[var(--success)]/40 bg-[var(--success)]/8'
                   : 'border-[var(--danger)]/40 bg-[var(--danger)]/8',
               )}
             >
-              <p
-                className={cn(
-                  'flex items-center gap-2 text-sm font-semibold',
-                  isCorrect ? 'text-[var(--success)]' : 'text-[var(--danger)]',
-                )}
-              >
-                {isCorrect ? <Check className="size-4" /> : <X className="size-4" />}
-                {isCorrect ? 'Resposta correta!' : 'Resposta incorreta'}
-              </p>
-              <p className="mt-2 text-sm leading-relaxed text-foreground/80 text-pretty">
-                <span className="font-medium text-foreground">Explicação do Assistente: </span>
-                {question.explanation}
-              </p>
+              <img
+                src={isCorrect ? '/anne-success.jpg' : '/anne-error.jpg'}
+                alt={isCorrect ? 'Anne Acertou!' : 'Anne Errou!'}
+                className="size-16 rounded-xl object-cover border-2 border-background shadow-md shrink-0"
+              />
+              <div className="flex-1 min-w-0">
+                <p
+                  className={cn(
+                    'flex items-center gap-2 text-sm font-semibold',
+                    isCorrect ? 'text-[var(--success)]' : 'text-[var(--danger)]',
+                  )}
+                >
+                  {isCorrect ? <Check className="size-4" /> : <X className="size-4" />}
+                  {isCorrect ? 'Sucesso! Resposta correta!' : 'Ops! Que pena, resposta incorreta.'}
+                </p>
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground/80 text-pretty">
+                  <span className="font-medium text-foreground">Explicação da Anne: </span>
+                  {question.explanation}
+                </p>
+              </div>
             </div>
 
             <div className="flex justify-start">

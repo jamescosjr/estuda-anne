@@ -86,8 +86,8 @@ export function DailyBriefingCard() {
     <Card className="relative overflow-hidden border-primary/20 bg-gradient-to-r from-primary/10 via-background to-secondary/10 shadow-sm backdrop-blur-md">
       <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-4">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary shadow-inner">
-            <Bot className="size-5 animate-pulse" />
+          <div className="relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-primary/30 shadow-md bg-background">
+            <img src="/anne-welcome.jpg" alt="Anne Avatar" className="size-full object-cover" />
           </div>
 
           <div className="space-y-1.5 min-w-0 flex-1">

@@ -316,13 +316,15 @@ export function Materials() {
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {uploads.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-10 text-center rounded-xl border border-dashed border-border bg-muted/20">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
-                <FolderOpen className="size-6" />
-              </span>
-              <h3 className="font-semibold text-foreground text-sm">Nenhum material enviado ainda</h3>
-              <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                Envie suas apostilas (PDF), apresentações (PPTX) ou gravações de aulas (MP3/MP4) na zona acima. O assistente pedagógico gerará quizzes e flashcards automaticamente para você!
+            <div className="flex flex-col items-center justify-center p-8 text-center rounded-xl border border-dashed border-border bg-muted/20 gap-3">
+              <img
+                src="/anne-study.jpg"
+                alt="Anne - Hora de Estudar!"
+                className="size-24 rounded-2xl object-cover border-2 border-primary/20 shadow-md"
+              />
+              <h3 className="font-semibold text-foreground text-base">Envie seus materiais para começar</h3>
+              <p className="text-xs text-muted-foreground max-w-md text-pretty">
+                Envie suas apostilas (PDF), slides (PPTX) ou gravações (MP3/MP4). A Anne vai analisar todo o conteúdo e gerar quizzes e flashcards personalizados para você!
               </p>
             </div>
           ) : (
