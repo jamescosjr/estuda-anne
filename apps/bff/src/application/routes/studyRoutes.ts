@@ -201,7 +201,8 @@ export async function studyRoutes(app: FastifyInstance) {
   // Rota para consultar Flashcards Pendentes de Revisão Espaçada
   app.get('/api/flashcards/due', async (request, reply) => {
     const { studentId = 'anne-student-1', topic, allowedSubjects, subjects } = request.query as any;
-    const activeSubjects = allowedSubjects || subjects;
+    const context = DailyBriefingListener.getContext(studentId);
+    const activeSubjects = allowedSubjects || subjects || (context?.subjects && context.subjects.length > 0 ? context.subjects : undefined);
 
     try {
       const dueUrl = new URL(`${STUDY_ENGINE_URL}/flashcards/due`);
@@ -249,7 +250,8 @@ export async function studyRoutes(app: FastifyInstance) {
   // Rota para Gerar Sessão Extra de Flashcards (reavalia perfil e gera novos flashcards persistidos)
   app.post('/api/flashcards/extra-session', async (request, reply) => {
     const { studentId = 'anne-student-1', subjectId, topic, allowedSubjects, subjects, count, excludeIds } = (request.body as any) || {};
-    const activeSubjects = allowedSubjects || subjects;
+    const context = DailyBriefingListener.getContext(studentId);
+    const activeSubjects = allowedSubjects || subjects || (context?.subjects && context.subjects.length > 0 ? context.subjects : undefined);
 
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/flashcards/extra-session`, {
@@ -491,6 +493,10 @@ export async function studyRoutes(app: FastifyInstance) {
     let events: string[] = [];
     let studentSubjects: string[] = [];
 
+    const context = DailyBriefingListener.getContext(studentId);
+    const studentName = name || context?.studentName || 'Estudante';
+    const profileSubjects = context?.subjects || [];
+
     // 1. Busca dinamicamente os materiais do aluno para obter as matérias reais
     try {
       const matRes = await fetch(`${STUDY_ENGINE_URL}/materials?studentId=${encodeURIComponent(studentId)}`);
@@ -506,9 +512,13 @@ export async function studyRoutes(app: FastifyInstance) {
       // Ignora erro de rede ao buscar materiais
     }
 
-    // 2. Busca dinamicamente a contagem de flashcards pendentes do aluno
+    // 2. Busca dinamicamente a contagem de flashcards pendentes do aluno considerando allowedSubjects do perfil
     try {
-      const dueRes = await fetch(`${STUDY_ENGINE_URL}/flashcards/due?studentId=${encodeURIComponent(studentId)}`);
+      const dueParams = new URLSearchParams({ studentId });
+      if (profileSubjects.length > 0) {
+        dueParams.set('allowedSubjects', profileSubjects.join(','));
+      }
+      const dueRes = await fetch(`${STUDY_ENGINE_URL}/flashcards/due?${dueParams.toString()}`);
       if (dueRes.ok) {
         const dueCards = (await dueRes.json()) as any[];
         if (Array.isArray(dueCards)) {
@@ -519,12 +529,19 @@ export async function studyRoutes(app: FastifyInstance) {
       // Ignora erro de rede ao buscar flashcards
     }
 
-    const context = DailyBriefingListener.getContext(studentId);
-    const studentName = name || context?.studentName || 'Estudante';
-
-    const activeSubjects = studentSubjects.length > 0
-      ? studentSubjects
-      : (context?.subjects || []);
+    let activeSubjects: string[] = [];
+    if (profileSubjects.length > 0) {
+      activeSubjects = studentSubjects.filter((s) =>
+        profileSubjects.some(
+          (p) => p.toLowerCase() === s.toLowerCase() || s.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(s.toLowerCase())
+        )
+      );
+      if (activeSubjects.length === 0) {
+        activeSubjects = profileSubjects;
+      }
+    } else {
+      activeSubjects = studentSubjects;
+    }
 
     if (activeSubjects.length > 0) {
       events = activeSubjects.map((s) => `Revisão de ${s}`);

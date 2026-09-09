@@ -72,7 +72,7 @@ export class GenerateExtraSessionUseCase {
     }
 
     const matching = targetMaterials.filter((material) => materialMatchesTopic(material, topic, allowedSubjects));
-    const selected = (matching.length > 0 ? matching : targetMaterials)
+    const selected = matching
       .filter((material) => materialMatchesTopic(material, undefined, allowedSubjects))
       .filter((material) => materialHasStudyCorpus(material.rawContent, material.summary));
 

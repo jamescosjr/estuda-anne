@@ -8,6 +8,7 @@ import {
 import { ReviewFlashcardUseCase } from '../../domain/usecases/ReviewFlashcardUseCase.js';
 import { GetDueFlashcardsUseCase } from '../../domain/usecases/GetDueFlashcardsUseCase.js';
 import { GenerateExtraSessionUseCase } from '../../domain/usecases/GenerateExtraSessionUseCase.js';
+import { isSubjectAllowed } from '../../domain/services/FlashcardStudySession.js';
 
 export class FlashcardController {
   constructor(
@@ -25,10 +26,17 @@ export class FlashcardController {
       allowedSubjects: query.allowedSubjects,
     });
 
-    reply.status(200).send(cards.map((card) => ({
-      ...card.toJSON(),
-      subject: subjectByMaterialId[card.materialId] || card.tags[0] || 'Conceito',
-    })));
+    const allowed = query.allowedSubjects;
+    reply.status(200).send(cards.map((card) => {
+      const rawSubject = subjectByMaterialId[card.materialId] || card.tags[0] || 'Conceito';
+      const cleanSubject = allowed && allowed.length > 0
+        ? (allowed.find((s) => isSubjectAllowed(rawSubject, [s])) || allowed[0])
+        : rawSubject;
+      return {
+        ...card.toJSON(),
+        subject: cleanSubject,
+      };
+    }));
   }
 
   public async review(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -60,6 +68,7 @@ export class FlashcardController {
       targetType: 'flashcards',
     });
 
+    const allowed = body.allowedSubjects;
     reply.status(201).send({
       message: 'Sessão extra de flashcards gerada e persistida com sucesso!',
       generatedCount: result.generatedFlashcardsCount,
@@ -67,10 +76,16 @@ export class FlashcardController {
       weakTopics: result.weakTopics,
       adaptiveHint: result.adaptiveHint,
       newCardIds: result.newCardIds,
-      flashcards: result.flashcards.map((f) => ({
-        ...f.toJSON(),
-        subject: f.tags[0] || 'Conceito',
-      })),
+      flashcards: result.flashcards.map((f) => {
+        const rawSubject = f.tags[0] || 'Conceito';
+        const cleanSubject = allowed && allowed.length > 0
+          ? (allowed.find((s) => isSubjectAllowed(rawSubject, [s])) || allowed[0])
+          : rawSubject;
+        return {
+          ...f.toJSON(),
+          subject: cleanSubject,
+        };
+      }),
     });
   }
 }
