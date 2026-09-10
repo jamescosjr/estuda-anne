@@ -122,7 +122,10 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
         if (scheduleRes.ok) {
           const schedule = await scheduleRes.json()
-          const items = Array.isArray(schedule.items) ? schedule.items : []
+          const rawItems = Array.isArray(schedule.items) ? schedule.items : []
+          const items = subjects.length > 0
+            ? rawItems.filter((item: any) => item.subject && subjects.includes(item.subject))
+            : rawItems
           const completed = items.filter((item: any) => item.completed).length
           pct = items.length ? Math.round((completed / items.length) * 100) : 0
 
@@ -162,7 +165,7 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           setMetrics(metricsData)
           setPendingTasks(metricsData.pendingSummary.items || [])
           if (metricsData.evolutionary?.overallCompletionPct !== undefined) {
-            setOverall(metricsData.evolutionary.overallCompletionPct)
+            pct = metricsData.evolutionary.overallCompletionPct
           }
 
           if (metricsData.subjectProgress && metricsData.subjectProgress.length > 0) {

@@ -157,6 +157,34 @@ export class GetStudentMetricsUseCase {
       }
     }
 
+    // Incorporar materiais e flashcards por matéria nas estatísticas para precisão do progresso do semestre
+    materials.forEach((mat) => {
+      const matSub = mat.subject;
+      if (matSub && (!allowedSubjectsSet || allowedSubjectsSet.has(matSub))) {
+        let stats = subjectStats.get(matSub);
+        if (!stats) {
+          stats = { topicsTotal: 0, topicsCompleted: 0, overdueCount: 0 };
+          subjectStats.set(matSub, stats);
+        }
+        stats.topicsTotal += 1;
+      }
+    });
+
+    validFlashcards.forEach((card) => {
+      const cardSub = card.materialId ? materialSubjectMap.get(card.materialId) : undefined;
+      if (cardSub && (!allowedSubjectsSet || allowedSubjectsSet.has(cardSub))) {
+        let stats = subjectStats.get(cardSub);
+        if (!stats) {
+          stats = { topicsTotal: 0, topicsCompleted: 0, overdueCount: 0 };
+          subjectStats.set(cardSub, stats);
+        }
+        stats.topicsTotal += 1;
+        if ((card.repetitionsCount || 0) > 0 || (card.history && card.history.length > 0)) {
+          stats.topicsCompleted += 1;
+        }
+      }
+    });
+
     // Adicionar item consolidado de flashcards vencidos para o dashboard se houver
     if (dueFlashcardsCount > 0) {
       pendingItems.push({
@@ -279,8 +307,14 @@ export class GetStudentMetricsUseCase {
       countGrades > 0 ? Math.round((totalGrades / (countGrades * 5)) * 100) : 85;
 
     const totalTimeSpent = weeklyVelocity.reduce((acc, curr) => acc + curr.completedMinutes, 0);
+
+    const totalTopicsSum = Array.from(subjectStats.values()).reduce((acc, s) => acc + s.topicsTotal, 0);
+    const completedTopicsSum = Array.from(subjectStats.values()).reduce((acc, s) => acc + s.topicsCompleted, 0);
+
     const overallCompletionPct =
-      allScheduleItems.length > 0
+      totalTopicsSum > 0
+        ? Math.round((completedTopicsSum / totalTopicsSum) * 100)
+        : allScheduleItems.length > 0
         ? Math.round(
             (allScheduleItems.filter((i) => i.completed).length / allScheduleItems.length) * 100
           )
