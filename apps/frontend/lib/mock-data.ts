@@ -1,4 +1,4 @@
-export type TabId = 'dashboard' | 'materials' | 'quiz' | 'flashcards' | 'schedule' | 'profile' | 'admin'
+export type TabId = 'dashboard' | 'materials' | 'quiz' | 'flashcards' | 'schedule' | 'profile' | 'admin' | 'tira-duvidas'
 
 export type UploadStatus = 'processing' | 'done' | 'failed'
 

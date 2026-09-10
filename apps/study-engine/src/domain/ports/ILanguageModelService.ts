@@ -83,6 +83,7 @@ export interface ILanguageModelService {
 
   analyzeScheduleImageOrDocument(fileData: { mimeType?: string; dataBase64?: string; textContent?: string }): Promise<ParsedScheduleAnalysisResult>;
   extractTextFromMultimodalDocument(fileData: { mimeType?: string; dataBase64?: string }): Promise<string>;
+  generateContent?(options: { prompt: string; temperature?: number }): Promise<string>;
   generateDailyBriefingStream(
     studentName: string,
     metrics: { dueFlashcardsCount: number; todayEvents: string[] },

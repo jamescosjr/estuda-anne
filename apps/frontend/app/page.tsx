@@ -14,6 +14,8 @@ import { ReviewSession } from '@/components/study/review-session'
 import { Schedule } from '@/components/study/schedule'
 import { ProfileScreen } from '@/components/study/profile-screen'
 import { AdminStudentsManagement } from '@/components/study/admin-students-management'
+import { TiraDuvidas } from '@/components/study/tira-duvidas'
+import { ExamSprintModal } from '@/components/study/exam-sprint-modal'
 import { AuthProvider, useAuth } from '@/lib/auth-context'
 import { LoginScreen } from '@/components/auth/login-screen'
 
@@ -38,6 +40,10 @@ const pageMeta: Record<TabId, { title: string; subtitle: string }> = {
     title: 'Cronograma e configurações',
     subtitle: 'Acompanhe seu plano de estudos e ajuste suas notificações.',
   },
+  'tira-duvidas': {
+    title: 'Tira-Dúvidas AI com a Anne',
+    subtitle: 'Faça perguntas por escrito e receba explicações didáticas em tempo real.',
+  },
   profile: {
     title: 'Meu perfil e matérias',
     subtitle: 'Configure seu curso, período, matérias e disponibilidade para a IA montar seu cronograma.',
@@ -53,6 +59,7 @@ function MainAppShell() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [isExamSprintOpen, setIsExamSprintOpen] = useState(false)
 
   // Restaurar aba persistida no F5 / reload a partir de window.location.hash ou localStorage
   useEffect(() => {
@@ -60,7 +67,7 @@ function MainAppShell() {
       if (typeof window === 'undefined') return
       const hash = window.location.hash.replace('#', '') as TabId
       const stored = localStorage.getItem('estuda_anne_active_tab') as TabId
-      const validTabs: TabId[] = ['dashboard', 'materials', 'quiz', 'flashcards', 'schedule', 'profile', 'admin']
+      const validTabs: TabId[] = ['dashboard', 'materials', 'quiz', 'flashcards', 'schedule', 'profile', 'admin', 'tira-duvidas']
 
       if (hash && validTabs.includes(hash)) {
         setActiveTab(hash)
@@ -100,7 +107,7 @@ function MainAppShell() {
     return <LoginScreen />
   }
 
-  const meta = pageMeta[activeTab]
+  const meta = pageMeta[activeTab] || pageMeta.dashboard
 
   function handleSelect(tab: TabId) {
     if (tab === 'admin' && user?.role !== 'ADMIN') {
@@ -212,12 +219,25 @@ function MainAppShell() {
             {activeTab === 'materials' && <Materials />}
             {activeTab === 'quiz' && <QuizSession />}
             {activeTab === 'flashcards' && <ReviewSession />}
-            {activeTab === 'schedule' && <Schedule onNavigateToProfile={() => handleSelect('profile')} />}
+            {activeTab === 'schedule' && (
+              <Schedule
+                onNavigateToProfile={() => handleSelect('profile')}
+                onNavigateToTab={(tab) => handleSelect(tab)}
+                onOpenExamSprint={() => setIsExamSprintOpen(true)}
+              />
+            )}
+            {activeTab === 'tira-duvidas' && <TiraDuvidas />}
             {activeTab === 'profile' && <ProfileScreen onSaveAndGenerateSchedule={() => handleSelect('schedule')} />}
             {activeTab === 'admin' && user?.role === 'ADMIN' && <AdminStudentsManagement />}
           </div>
         </main>
       </div>
+
+      <ExamSprintModal
+        open={isExamSprintOpen}
+        onOpenChange={setIsExamSprintOpen}
+        onSuccess={() => handleSelect('schedule')}
+      />
     </div>
   )
 }

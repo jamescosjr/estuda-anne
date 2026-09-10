@@ -67,4 +67,28 @@ export class ScheduleController {
     });
     reply.status(200).send(result);
   }
+
+  public async generateExamSprint(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const { studentId, subject, examDate, topics, entireSubject, intensity } = (request.body as any) || {};
+
+    if (!studentId || !subject || !examDate) {
+      reply.status(400).send({ message: 'studentId, subject e examDate são obrigatórios' });
+      return;
+    }
+
+    const generateExamSprintUseCase = new (await import('../../domain/usecases/GenerateExamSprintUseCase.js')).GenerateExamSprintUseCase(
+      this.scheduleRepository
+    );
+
+    const result = await generateExamSprintUseCase.execute({
+      studentId,
+      subject,
+      examDate: new Date(examDate),
+      topics: Array.isArray(topics) ? topics : undefined,
+      entireSubject: Boolean(entireSubject),
+      intensity: intensity || 'intensivo',
+    });
+
+    reply.status(200).send(result);
+  }
 }

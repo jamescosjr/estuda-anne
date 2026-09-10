@@ -30,7 +30,8 @@ export function DailyBriefingCard() {
         setIsDone(true)
         return
       }
-      const url = `${baseUrl}/api/daily-briefing?studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(studentName)}`
+      const userSubjects = user?.subjects?.join(',') || ''
+      const url = `${baseUrl}/api/daily-briefing?studentId=${encodeURIComponent(studentId)}&name=${encodeURIComponent(studentName)}&subjects=${encodeURIComponent(userSubjects)}`
 
       const response = await fetch(url)
       if (!response.ok || !response.body) {

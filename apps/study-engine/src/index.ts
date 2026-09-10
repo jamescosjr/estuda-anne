@@ -155,7 +155,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       vectorRepo,
       contentExtractor
     );
-    const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo, profileRepo);
+    const reviewFlashcardUseCase = new ReviewFlashcardUseCase(flashcardRepo, profileRepo, scheduleRepo);
     const getDueFlashcardsUseCase = new GetDueFlashcardsUseCase(flashcardRepo, materialRepo);
     const generateScheduleUseCase = new GenerateStudyScheduleUseCase(
       scheduleRepo,
@@ -179,7 +179,7 @@ async function registerPersistenceRoutes(app: FastifyInstance): Promise<void> {
       scheduleRepo
     );
     const analyzeScheduleFileUseCase = new AnalyzeScheduleFileUseCase(geminiAdapter);
-    const evaluateQuizUseCase = new EvaluateQuizUseCase(quizRepo, profileRepo);
+    const evaluateQuizUseCase = new EvaluateQuizUseCase(quizRepo, profileRepo, scheduleRepo);
     const getQuizSessionUseCase = new GetQuizSessionUseCase(quizRepo, profileRepo);
     const generateExtraSessionUseCase = new GenerateExtraSessionUseCase(
       materialRepo,

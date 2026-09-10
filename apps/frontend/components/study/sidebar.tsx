@@ -8,6 +8,7 @@ import {
   Layers,
   ListChecks,
   LogOut,
+  MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
   ShieldCheck,
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { id: 'quiz', label: 'Quizzes', icon: ListChecks },
   { id: 'flashcards', label: 'Flashcards', icon: BookOpen },
   { id: 'schedule', label: 'Cronograma', icon: CalendarClock },
+  { id: 'tira-duvidas', label: 'Tira-Dúvidas AI', icon: MessageSquare },
   { id: 'profile', label: 'Meu Perfil', icon: UserCog },
   { id: 'admin', label: 'Gestão Admin', icon: ShieldCheck },
 ]

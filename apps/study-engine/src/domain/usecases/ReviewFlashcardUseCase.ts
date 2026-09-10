@@ -1,5 +1,5 @@
 import { ReviewGrade, isValidReviewGrade } from '../value-objects/index.js';
-import { IFlashcardRepository } from '../ports/index.js';
+import { IFlashcardRepository, IStudyScheduleRepository } from '../ports/index.js';
 import { NotFoundError } from '../errors/DomainError.js';
 import { IStudentAdaptiveProfileRepository } from './EvaluateQuizUseCase.js';
 import { StudentAdaptiveProfile } from '../entities/StudentAdaptiveProfile.js';
@@ -21,7 +21,8 @@ export interface ReviewFlashcardOutput {
 export class ReviewFlashcardUseCase {
   constructor(
     private readonly flashcardRepository: IFlashcardRepository,
-    private readonly profileRepository?: IStudentAdaptiveProfileRepository
+    private readonly profileRepository?: IStudentAdaptiveProfileRepository,
+    private readonly scheduleRepository?: IStudyScheduleRepository
   ) {}
 
   public async execute(input: ReviewFlashcardInput): Promise<ReviewFlashcardOutput> {
@@ -46,6 +47,28 @@ export class ReviewFlashcardUseCase {
         { topic, isCorrect: input.grade >= 3 },
       ]);
       await this.profileRepository.save(updated);
+    }
+
+    if (this.scheduleRepository) {
+      try {
+        const schedule = await this.scheduleRepository.findByStudentId(flashcard.studentId);
+        if (schedule) {
+          let updated = false;
+          const now = new Date();
+          for (const item of schedule.items) {
+            if (!item.completed && (item.flashcardIds?.includes(flashcard.id) || item.flashcardIds?.length)) {
+              item.completed = true;
+              item.completedAt = now;
+              updated = true;
+            }
+          }
+          if (updated) {
+            await this.scheduleRepository.save(schedule);
+          }
+        }
+      } catch {
+        // Ignora erro resiliente
+      }
     }
 
     return {

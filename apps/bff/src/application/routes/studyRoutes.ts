@@ -492,7 +492,7 @@ export async function studyRoutes(app: FastifyInstance) {
 
   // Rota SSE de Streaming para o Briefing Diário de Boas-vindas Inteligente
   app.get('/api/daily-briefing', async (request, reply) => {
-    const { studentId = 'anne-student-1', name = 'Anne' } = (request.query as any) || {};
+    const { studentId = 'anne-student-1', name = 'Anne', subjects: querySubjects } = (request.query as any) || {};
 
     reply.raw.setHeader('Content-Type', 'text/event-stream');
     reply.raw.setHeader('Cache-Control', 'no-cache');
@@ -505,7 +505,9 @@ export async function studyRoutes(app: FastifyInstance) {
 
     const context = DailyBriefingListener.getContext(studentId);
     const studentName = name || context?.studentName || 'Estudante';
-    const profileSubjects = context?.subjects || [];
+    const profileSubjects: string[] = typeof querySubjects === 'string' && querySubjects.trim()
+      ? querySubjects.split(',').map((s: string) => s.trim()).filter(Boolean)
+      : context?.subjects || [];
 
     // 1. Busca dinamicamente os materiais do aluno para obter as matérias reais
     try {
@@ -522,7 +524,7 @@ export async function studyRoutes(app: FastifyInstance) {
       // Ignora erro de rede ao buscar materiais
     }
 
-    // 2. Busca dinamicamente a contagem de flashcards pendentes do aluno considerando allowedSubjects do perfil
+    // 2. Busca dinamicamente a contagem de flashcards pendentes do aluno considerando apenas profileSubjects
     try {
       const dueParams = new URLSearchParams({ studentId });
       if (profileSubjects.length > 0) {
@@ -541,14 +543,7 @@ export async function studyRoutes(app: FastifyInstance) {
 
     let activeSubjects: string[] = [];
     if (profileSubjects.length > 0) {
-      activeSubjects = studentSubjects.filter((s) =>
-        profileSubjects.some(
-          (p) => p.toLowerCase() === s.toLowerCase() || s.toLowerCase().includes(p.toLowerCase()) || p.toLowerCase().includes(s.toLowerCase())
-        )
-      );
-      if (activeSubjects.length === 0) {
-        activeSubjects = profileSubjects;
-      }
+      activeSubjects = profileSubjects;
     } else {
       activeSubjects = studentSubjects;
     }
@@ -782,5 +777,95 @@ REGRAS RÍGIDAS:
         message: 'Serviço de métricas temporariamente indisponível',
       });
     }
+  });
+
+  // Rota para Gerar Sprint de Prova Específica
+  app.post('/api/study/schedule/exam-sprint', async (request, reply) => {
+    const { studentId = 'anne-student-1', subject, examDate, topics, entireSubject, intensity } = (request.body as any) || {};
+    try {
+      const res = await fetch(`${STUDY_ENGINE_URL}/schedule/exam-sprint`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studentId, subject, examDate, topics, entireSubject, intensity }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao gerar sprint de prova' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(500).send({ error: 'InternalServerError', message: err.message || String(err) });
+    }
+  });
+
+  // Rota Tira-Dúvidas AI (Perguntas Escritas com a Anne)
+  app.post('/api/study/ask-anne', async (request, reply) => {
+    const { studentId = 'anne-student-1', question, subject = 'Geral', studentName = 'Estudante' } = (request.body as any) || {};
+
+    if (!question || typeof question !== 'string' || !question.trim()) {
+      return reply.status(400).send({ message: 'A pergunta não pode estar em branco.' });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (apiKey) {
+      try {
+        const prompt = `Você é a Anne, uma tutora e mentora acadêmica universitária altamente capacitada, empática e didática.
+Sua missão é responder à dúvida enviada pela estudante ${studentName} de forma direta, clara, acolhedora e biologicamente/pedagogicamente eficiente.
+
+CONTEXTO DE ESTUDO DA ESTUDANTE:
+- Nome: ${studentName}
+- Disciplina em foco: ${subject}
+
+REGRAS DE RESPOSTA:
+1. Responda com clareza conceitual, dividindo em tópicos ou passos se necessário.
+2. Forneça exemplos práticos e analógicos sempre que útil.
+3. Termine com uma pergunta provocativa de estudo ativo para testar a retenção.
+4. Mantenha tom encorajador, didático e sem enrolação.
+
+PERGUNTA DA ESTUDANTE:
+"${question}"`;
+
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.6 },
+            }),
+          }
+        );
+
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          const answer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (answer) {
+            return reply.send({
+              answer,
+              subject,
+              createdAt: new Date(),
+              suggestedNextQuestions: [
+                `Como posso aplicar o conceito de ${subject} em um exercício prático?`,
+                `Pode me explicar um exemplo resolvido passo a passo?`,
+                `Quais os erros mais comuns nesse tópico de ${subject}?`,
+              ],
+            });
+          }
+        }
+      } catch (err: any) {
+        app.log.warn({ err }, 'Erro ao consultar Gemini para o Tira-Dúvidas');
+      }
+    }
+
+    return reply.send({
+      answer: `Oi ${studentName}! Compreendo sua dúvida sobre **${subject}**: "${question}".\n\nEste conceito é essencial no aprendizado ativo. Recomendo revisar os flashcards e materiais cadastrados nessa matéria para fixar os pontos principais com máxima retenção!`,
+      subject,
+      createdAt: new Date(),
+      suggestedNextQuestions: [
+        `Como praticar esse tópico de ${subject}?`,
+        `Gerar flashcards sobre esta dúvida`,
+      ],
+    });
   });
 }

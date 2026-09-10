@@ -77,7 +77,15 @@ function Toggle({
   )
 }
 
-export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => void }) {
+export function Schedule({
+  onNavigateToProfile,
+  onNavigateToTab,
+  onOpenExamSprint,
+}: {
+  onNavigateToProfile?: () => void
+  onNavigateToTab?: (tab: TabId, meta?: any) => void
+  onOpenExamSprint?: () => void
+}) {
   const { user } = useAuth()
   const [events, setEvents] = useState<ScheduleEvent[]>([])
   const [closing, setClosing] = useState(false)
@@ -180,11 +188,19 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
     <div className="grid gap-6 lg:grid-cols-3">
       {/* Lista do Cronograma */}
       <Card className="lg:col-span-2">
-        <CardHeader>
-          <CardTitle>Seu Plano de Estudos Personalizado</CardTitle>
-          <CardDescription>
-            Cronograma montado pela Anne com base nas suas matérias, provas e metas de estudo.
-          </CardDescription>
+        <CardHeader className="flex-row items-center justify-between">
+          <div>
+            <CardTitle>Seu Plano de Estudos Personalizado</CardTitle>
+            <CardDescription className="mt-1">
+              Cronograma montado pela Anne com baixa automática assim que você conclui cada atividade.
+            </CardDescription>
+          </div>
+          {onOpenExamSprint && (
+            <Button size="sm" onClick={onOpenExamSprint} className="gap-1.5 rounded-xl shrink-0">
+              <Sparkles className="size-4" />
+              Sprint para Prova
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
           {events.length === 0 ? (
@@ -215,19 +231,22 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
                   {dayEvents.map((event) => {
                     const meta = typeMeta[event.type]
                     const Icon = meta.icon
+                    const targetTab: TabId =
+                      event.type === 'quiz' ? 'quiz' : event.type === 'flashcards' ? 'flashcards' : 'materials'
+
                     return (
-                      <label
+                      <div
                         key={event.id}
                         className={cn(
-                          'flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50',
-                          event.done && 'opacity-60',
+                          'flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/40',
+                          event.done && 'opacity-60 bg-muted/20',
                         )}
                       >
                         <input
                           type="checkbox"
                           checked={event.done}
                           onChange={() => toggleDone(event.id)}
-                          className="size-4 shrink-0 accent-primary"
+                          className="size-4 shrink-0 accent-primary cursor-pointer"
                         />
                         <span
                           className={cn(
@@ -241,18 +260,27 @@ export function Schedule({ onNavigateToProfile }: { onNavigateToProfile?: () => 
                           <p
                             className={cn(
                               'truncate text-sm font-medium leading-tight',
-                              event.done && 'line-through',
+                              event.done && 'line-through text-muted-foreground',
                             )}
                           >
                             {event.title}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">{event.subject}</p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="text-xs font-medium">{event.time}</span>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {!event.done && onNavigateToTab && (
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 rounded-lg text-xs gap-1 px-2.5"
+                              onClick={() => onNavigateToTab(targetTab, { subject: event.subject, topic: event.title })}
+                            >
+                              Estudar Agora
+                            </Button>
+                          )}
                           <Badge variant="neutral">{meta.label}</Badge>
                         </div>
-                      </label>
+                      </div>
                     )
                   })}
                 </div>

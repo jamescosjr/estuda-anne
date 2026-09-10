@@ -91,6 +91,11 @@ export class StudySchedule {
     this.props.updatedAt = new Date();
   }
 
+  public setItems(items: StudyScheduleItem[]): void {
+    this.props.items = [...items];
+    this.props.updatedAt = new Date();
+  }
+
   public markItemCompleted(itemId: string): void {
     const item = this.props.items.find(i => i.id === itemId);
     if (!item) {

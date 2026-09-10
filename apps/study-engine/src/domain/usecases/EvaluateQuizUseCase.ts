@@ -2,6 +2,7 @@ import { IQuizRepository } from '../ports/IQuizRepository.js';
 import { QuizEvaluationResult } from '../entities/Quiz.js';
 import { NotFoundError } from '../errors/DomainError.js';
 import { StudentAdaptiveProfile } from '../entities/StudentAdaptiveProfile.js';
+import { IStudyScheduleRepository } from '../ports/IStudyScheduleRepository.js';
 
 export interface EvaluateQuizDTO {
   quizId: string;
@@ -31,7 +32,8 @@ export interface IStudentAdaptiveProfileRepository {
 export class EvaluateQuizUseCase {
   constructor(
     private readonly quizRepository: IQuizRepository,
-    private readonly profileRepository?: IStudentAdaptiveProfileRepository
+    private readonly profileRepository?: IStudentAdaptiveProfileRepository,
+    private readonly scheduleRepository?: IStudyScheduleRepository
   ) {}
 
   public async execute(dto: EvaluateQuizDTO): Promise<EvaluateQuizOutput> {
@@ -73,6 +75,28 @@ export class EvaluateQuizUseCase {
 
     if (this.profileRepository) {
       await this.profileRepository.save(updatedProfile);
+    }
+
+    if (this.scheduleRepository) {
+      try {
+        const schedule = await this.scheduleRepository.findByStudentId(dto.studentId);
+        if (schedule) {
+          let updated = false;
+          const now = new Date();
+          for (const item of schedule.items) {
+            if (!item.completed && (item.quizIds?.includes(dto.quizId) || item.quizIds?.length)) {
+              item.completed = true;
+              item.completedAt = now;
+              updated = true;
+            }
+          }
+          if (updated) {
+            await this.scheduleRepository.save(schedule);
+          }
+        }
+      } catch {
+        // Log ou tratamento resiliente de erro
+      }
     }
 
     const weakTopics = Object.entries(updatedProfile.topicWeights)
