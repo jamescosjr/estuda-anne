@@ -11,7 +11,17 @@ function resolveStudyEngineUrl(): string {
   return url;
 }
 
+function resolveMetricsUrl(): string {
+  const url = (process.env.METRICS_SERVICE_URL || 'http://localhost:3004').replace(/\/$/, '');
+  const inContainer = existsSync('/.dockerenv') || process.env.NODE_ENV === 'production';
+  if (inContainer && /localhost|127\.0\.0\.1/.test(url)) {
+    return url.replace(/localhost|127\.0\.0\.1/g, 'metrics');
+  }
+  return url;
+}
+
 const STUDY_ENGINE_URL = resolveStudyEngineUrl();
+const METRICS_SERVICE_URL = resolveMetricsUrl();
 
 async function readEngineJson(res: Response): Promise<unknown> {
   const text = await res.text();
@@ -711,6 +721,66 @@ REGRAS RÍGIDAS:
       return reply.send(await res.json());
     } catch (err: any) {
       return reply.status(500).send({ error: 'InternalServerError', message: err.message });
+    }
+  });
+
+  // Rotas para o novo microserviço Metrics
+  app.get('/api/metrics/overview', async (request, reply) => {
+    const { studentId = 'anne-student-1', date, subjects } = (request.query as any) || {};
+    try {
+      const params = new URLSearchParams({ studentId: String(studentId) });
+      if (date) params.set('date', String(date));
+      if (subjects) params.set('subjects', String(subjects));
+      const res = await fetch(`${METRICS_SERVICE_URL}/metrics/overview?${params.toString()}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar métricas de estudo' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      app.log.warn({ err }, 'Metrics Service offline ao buscar visão geral');
+      return reply.status(503).send({
+        error: 'MetricsServiceUnavailable',
+        message: 'Serviço de métricas temporariamente indisponível',
+      });
+    }
+  });
+
+  app.get('/api/metrics/schedule-adherence', async (request, reply) => {
+    const { studentId = 'anne-student-1', date } = (request.query as any) || {};
+    try {
+      const params = new URLSearchParams({ studentId: String(studentId) });
+      if (date) params.set('date', String(date));
+      const res = await fetch(`${METRICS_SERVICE_URL}/metrics/schedule-adherence?${params.toString()}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar aderência do cronograma' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(503).send({
+        error: 'MetricsServiceUnavailable',
+        message: 'Serviço de métricas temporariamente indisponível',
+      });
+    }
+  });
+
+  app.get('/api/metrics/evolution', async (request, reply) => {
+    const { studentId = 'anne-student-1', date } = (request.query as any) || {};
+    try {
+      const params = new URLSearchParams({ studentId: String(studentId) });
+      if (date) params.set('date', String(date));
+      const res = await fetch(`${METRICS_SERVICE_URL}/metrics/evolution?${params.toString()}`);
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar métricas evolutivas' }));
+        return reply.status(res.status).send(errJson);
+      }
+      return reply.send(await res.json());
+    } catch (err: any) {
+      return reply.status(503).send({
+        error: 'MetricsServiceUnavailable',
+        message: 'Serviço de métricas temporariamente indisponível',
+      });
     }
   });
 }

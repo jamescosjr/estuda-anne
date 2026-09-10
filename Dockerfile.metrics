@@ -1,0 +1,39 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/metrics/package.json apps/metrics/
+
+RUN pnpm install --frozen-lockfile
+
+COPY packages/shared packages/shared
+COPY apps/metrics apps/metrics
+
+RUN pnpm --filter @estuda-anne/shared build
+RUN pnpm --filter @estuda-anne/metrics build
+
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV METRICS_SERVICE_PORT=3004
+ENV METRICS_SERVICE_HOST=0.0.0.0
+
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/metrics/package.json apps/metrics/
+
+RUN pnpm install --prod --frozen-lockfile
+
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=builder /app/apps/metrics/dist ./apps/metrics/dist
+
+EXPOSE 3004
+
+CMD ["node", "apps/metrics/dist/index.js"]

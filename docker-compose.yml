@@ -50,6 +50,23 @@ services:
     networks:
       - estuda-anne-network
 
+  # Serviço de Métricas e Acompanhamento Evolutivo
+  metrics:
+    build:
+      context: .
+      dockerfile: Dockerfile.metrics
+    container_name: estuda-anne-metrics
+    restart: always
+    ports:
+      - "9004:3004"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - METRICS_SERVICE_PORT=3004
+    networks:
+      - estuda-anne-network
+
   # Backend For Frontend (BFF)
   bff:
     build:
@@ -66,10 +83,12 @@ services:
       - BFF_PORT=3001
       - AUTH_SERVICE_URL=http://auth:3005
       - STUDY_ENGINE_URL=http://study-engine:3002
+      - METRICS_SERVICE_URL=http://metrics:3004
       - CORS_ORIGIN=${CORS_ORIGIN:-https://estuda-anne.singulartech.space}
     depends_on:
       - auth
       - study-engine
+      - metrics
     networks:
       - estuda-anne-network
 

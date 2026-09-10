@@ -1,8 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ArrowUpRight, BookOpen, CalendarClock, Clock, ListChecks, Sparkles, TrendingUp, FolderPlus } from 'lucide-react'
-import { type TabId, type ScheduleEvent, type CourseProgress, type PendingReview } from '@/lib/mock-data'
+import {
+  ArrowUpRight,
+  BookOpen,
+  CalendarClock,
+  Clock,
+  ListChecks,
+  Sparkles,
+  TrendingUp,
+  FolderPlus,
+  AlertTriangle,
+  Flame,
+  Activity,
+  CheckCircle2,
+} from 'lucide-react'
+import { type TabId, type ScheduleEvent, type CourseProgress } from '@/lib/mock-data'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,14 +37,61 @@ interface DashboardProps {
   onNavigate: (tab: TabId) => void
 }
 
+interface PendingItemDisplay {
+  id: string
+  subject: string
+  title: string
+  type: 'schedule_overdue' | 'flashcard_due' | 'quiz_pending' | 'reading'
+  estimatedMinutes: number
+  isOverdue: boolean
+}
+
+interface MetricsOverviewData {
+  pendingSummary: {
+    totalPendingCount: number
+    overdueScheduleCount: number
+    dueFlashcardsCount: number
+    items: PendingItemDisplay[]
+  }
+  scheduleAdherence: {
+    totalScheduledItems: number
+    completedItems: number
+    overdueItems: number
+    onTimeItems: number
+    adherencePercentage: number
+    status: 'EM_DIA' | 'ATRASADO' | 'SEM_CRONOGRAMA'
+  }
+  evolutionary: {
+    weeklyVelocity: Array<{
+      day: string
+      date: string
+      targetMinutes: number
+      completedMinutes: number
+      completedTasksCount: number
+    }>
+    studyStreakDays: number
+    overallCompletionPct: number
+    totalTimeSpentMinutes: number
+    retentionRatePct: number
+  }
+  subjectProgress: Array<{
+    subjectName: string
+    progressPct: number
+    topicsTotal: number
+    topicsCompleted: number
+    overdueCount: number
+  }>
+}
+
 export function Dashboard({ onNavigate }: DashboardProps) {
   const { user } = useAuth()
   const subjects = user?.subjects || []
   const hasSubjects = subjects.length > 0
   const [overall, setOverall] = useState(0)
   const [userProgress, setUserProgress] = useState<CourseProgress[]>([])
-  const [userReviews, setUserReviews] = useState<PendingReview[]>([])
+  const [pendingTasks, setPendingTasks] = useState<PendingItemDisplay[]>([])
   const [upcomingEvents, setUpcomingEvents] = useState<ScheduleEvent[]>([])
+  const [metrics, setMetrics] = useState<MetricsOverviewData | null>(null)
 
   useEffect(() => {
     const studentId = user?.id
@@ -40,9 +100,13 @@ export function Dashboard({ onNavigate }: DashboardProps) {
 
     async function loadDashboard() {
       try {
-        const [scheduleRes, dueRes] = await Promise.all([
+        const [scheduleRes, metricsRes] = await Promise.all([
           fetch(`${bffUrl}/api/study/schedule?studentId=${encodeURIComponent(studentId)}`),
-          fetch(`${bffUrl}/api/flashcards/due?studentId=${encodeURIComponent(studentId)}`),
+          fetch(
+            `${bffUrl}/api/metrics/overview?studentId=${encodeURIComponent(studentId)}${
+              subjects.length ? `&subjects=${encodeURIComponent(subjects.join(','))}` : ''
+            }`
+          ),
         ])
 
         let progressRows: CourseProgress[] = subjects.map((sub, idx) => ({
@@ -93,28 +157,33 @@ export function Dashboard({ onNavigate }: DashboardProps) {
             })
         }
 
-        const reviews: PendingReview[] = []
-        if (dueRes.ok) {
-          const due = await dueRes.json()
-          if (Array.isArray(due) && due.length > 0) {
-            reviews.push({
-              id: 'due-flashcards',
-              subject: 'Revisão espaçada',
-              type: 'flashcards',
-              count: due.length,
-              estimatedMinutes: Math.max(8, due.length * 2),
-            })
+        if (metricsRes.ok) {
+          const metricsData: MetricsOverviewData = await metricsRes.json()
+          setMetrics(metricsData)
+          setPendingTasks(metricsData.pendingSummary.items || [])
+          if (metricsData.evolutionary?.overallCompletionPct !== undefined) {
+            setOverall(metricsData.evolutionary.overallCompletionPct)
+          }
+
+          if (metricsData.subjectProgress && metricsData.subjectProgress.length > 0) {
+            progressRows = metricsData.subjectProgress.map((sp, idx) => ({
+              id: `c-${sp.subjectName}-${idx}`,
+              name: sp.subjectName,
+              color: colorPalette[idx % colorPalette.length],
+              progress: sp.progressPct,
+              topics: sp.topicsTotal,
+              reviewed: sp.topicsCompleted,
+            }))
           }
         }
 
         setOverall(pct)
         setUserProgress(progressRows)
-        setUserReviews(reviews)
         setUpcomingEvents(nextEvents)
       } catch {
         setOverall(0)
         setUserProgress([])
-        setUserReviews([])
+        setPendingTasks([])
         setUpcomingEvents([])
       }
     }
@@ -122,25 +191,43 @@ export function Dashboard({ onNavigate }: DashboardProps) {
     loadDashboard()
   }, [user?.id, user?.subjects])
 
+  const overdueScheduleCount = metrics?.pendingSummary?.overdueScheduleCount || 0
+  const isScheduleDelayed = metrics?.scheduleAdherence?.status === 'ATRASADO' || overdueScheduleCount > 0
+
   return (
     <div className="flex flex-col gap-6">
       {/* Daily Briefing Card - Boas-vindas Inteligente com Streaming SSE */}
       <DailyBriefingCard />
 
-      {/* Banner de Saudação Personalizado */}
+      {/* Banner de Saudação Personalizado com Alerta de Status do Cronograma */}
       <Card className="overflow-hidden">
         <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="max-w-md">
-            <Badge variant="default" className="mb-3">
-              <Sparkles className="size-3.5" />
-              Plano de Estudos Personalizado
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <Badge variant="default">
+                <Sparkles className="size-3.5" />
+                Plano de Estudos Personalizado
+              </Badge>
+              {isScheduleDelayed ? (
+                <Badge variant="destructive" className="flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  {overdueScheduleCount} pendência(s) no cronograma
+                </Badge>
+              ) : metrics?.scheduleAdherence?.status === 'EM_DIA' ? (
+                <Badge variant="secondary" className="flex items-center gap-1 text-[var(--success)]">
+                  <CheckCircle2 className="size-3" />
+                  Cronograma em dia
+                </Badge>
+              ) : null}
+            </div>
             <h2 className="font-display text-xl font-semibold tracking-tight text-balance">
               Bom te ver, {user?.name || 'Estudante'}. {hasSubjects ? `Você concluiu ${overall}% do plano do semestre.` : 'Bem-vinda ao Estuda Anne!'}
             </h2>
             <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground text-pretty">
               {hasSubjects
-                ? `A Anne organizou suas revisões de ${subjects.join(', ')} e ajustou seu cronograma de acordo com suas metas.`
+                ? isScheduleDelayed
+                  ? `Você tem ${overdueScheduleCount} atividade(s) do cronograma que venceram e precisam de atenção!`
+                  : `A Anne organizou suas revisões de ${subjects.join(', ')} e seu cronograma está em dia.`
                 : 'Cadastre suas disciplinas no Perfil ou faça upload do seu cronograma para a IA organizar sua rotina de estudos!'}
             </p>
           </div>
@@ -163,8 +250,8 @@ export function Dashboard({ onNavigate }: DashboardProps) {
                 <span className="absolute font-display text-lg font-semibold">{overall}%</span>
               </div>
               <div className="text-sm">
-                <p className="flex items-center gap-1 font-medium text-[var(--success)]">
-                  <TrendingUp className="size-4" /> Em progresso
+                <p className={`flex items-center gap-1 font-medium ${isScheduleDelayed ? 'text-amber-600' : 'text-[var(--success)]'}`}>
+                  <TrendingUp className="size-4" /> {isScheduleDelayed ? 'Atenção às pendências' : 'Em progresso'}
                 </p>
                 <p className="mt-1 text-muted-foreground">{subjects.length} matérias ativas</p>
               </div>
@@ -195,6 +282,49 @@ export function Dashboard({ onNavigate }: DashboardProps) {
         </Card>
       ) : (
         <>
+          {/* Seção de Acompanhamento Evolutivo */}
+          {metrics?.evolutionary && (
+            <Card className="border-primary/20 bg-gradient-to-r from-primary/5 via-background to-background">
+              <CardHeader className="flex-row items-center justify-between pb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="size-5 text-primary" />
+                  <CardTitle className="text-base font-semibold">Acompanhamento Evolutivo</CardTitle>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Badge variant="secondary" className="gap-1.5 py-1 px-3">
+                    <Flame className="size-4 text-orange-500 fill-orange-500" />
+                    <span>{metrics.evolutionary.studyStreakDays} dias seguidos</span>
+                  </Badge>
+                  <Badge variant="outline" className="gap-1.5 py-1 px-3">
+                    <span>{metrics.evolutionary.retentionRatePct}% de retenção</span>
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-2">
+                <p className="text-xs text-muted-foreground mb-4">
+                  Velocidade de estudos dos últimos 7 dias (tempo dedicado e tarefas concluídas):
+                </p>
+                <div className="grid grid-cols-7 gap-2">
+                  {metrics.evolutionary.weeklyVelocity.map((v, i) => {
+                    const pct = v.targetMinutes > 0 ? Math.min(100, Math.round((v.completedMinutes / v.targetMinutes) * 100)) : 0
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-1.5 text-center">
+                        <div className="w-full bg-muted/80 rounded-lg h-20 relative flex flex-col justify-end overflow-hidden p-1">
+                          <div
+                            className="bg-primary/80 rounded-md transition-all duration-500 w-full"
+                            style={{ height: `${Math.max(12, pct)}%` }}
+                          />
+                        </div>
+                        <span className="text-[11px] font-medium text-foreground">{v.day}</span>
+                        <span className="text-[10px] text-muted-foreground">{v.completedMinutes}m</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Progresso do semestre */}
             <Card className="lg:col-span-2">
@@ -220,46 +350,71 @@ export function Dashboard({ onNavigate }: DashboardProps) {
               </CardContent>
             </Card>
 
-            {/* Revisões de hoje */}
+            {/* Pendências e Revisões sugeridas reais */}
             <Card>
               <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>Revisões sugeridas</CardTitle>
-                <Badge variant="warning">{userReviews.length} pendentes</Badge>
+                <CardTitle>Revisões & Pendências</CardTitle>
+                <Badge variant={isScheduleDelayed ? 'destructive' : 'warning'}>
+                  {pendingTasks.length} pendente(s)
+                </Badge>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
-                {userReviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          {review.type === 'quiz' ? (
-                            <ListChecks className="size-4.5" />
-                          ) : (
-                            <BookOpen className="size-4.5" />
-                          )}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium leading-tight">{review.subject}</p>
-                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="size-3" />
-                            {review.count} itens · ~{review.estimatedMinutes} min
-                          </p>
+                {pendingTasks.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    🎉 Nenhuma pendência no momento! Seu cronograma e revisões estão 100% em dia.
+                  </div>
+                ) : (
+                  pendingTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`flex flex-col gap-3 rounded-xl border p-3 ${
+                        task.isOverdue ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-background/60'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2.5">
+                          <span
+                            className={`flex size-9 items-center justify-center rounded-lg ${
+                              task.isOverdue ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'
+                            }`}
+                          >
+                            {task.type === 'quiz_pending' ? (
+                              <ListChecks className="size-4.5" />
+                            ) : task.type === 'flashcard_due' ? (
+                              <BookOpen className="size-4.5" />
+                            ) : (
+                              <AlertTriangle className="size-4.5" />
+                            )}
+                          </span>
+                          <div>
+                            <p className="text-sm font-medium leading-tight">{task.subject}</p>
+                            <p className="line-clamp-1 text-xs text-muted-foreground">{task.title}</p>
+                            <p className="flex items-center gap-1 text-[11px] text-muted-foreground mt-0.5">
+                              <Clock className="size-3" />
+                              ~{task.estimatedMinutes} min {task.isOverdue && '· Tarefa atrasada'}
+                            </p>
+                          </div>
                         </div>
                       </div>
+                      <Button
+                        size="sm"
+                        variant={task.isOverdue ? 'destructive' : task.type === 'quiz_pending' ? 'default' : 'secondary'}
+                        className="w-full"
+                        onClick={() => {
+                          if (task.type === 'schedule_overdue') onNavigate('schedule')
+                          else if (task.type === 'quiz_pending') onNavigate('quiz')
+                          else onNavigate('flashcards')
+                        }}
+                      >
+                        {task.type === 'schedule_overdue'
+                          ? 'Resolver no Cronograma'
+                          : task.type === 'quiz_pending'
+                          ? 'Iniciar Quiz'
+                          : 'Revisar Flashcards'}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={review.type === 'quiz' ? 'default' : 'secondary'}
-                      className="w-full"
-                      onClick={() => onNavigate(review.type === 'quiz' ? 'quiz' : 'flashcards')}
-                    >
-                      {review.type === 'quiz' ? 'Iniciar quiz' : 'Revisar flashcards'}
-                    </Button>
-                  </div>
-                ))}
+                  ))
+                )}
               </CardContent>
             </Card>
           </div>
