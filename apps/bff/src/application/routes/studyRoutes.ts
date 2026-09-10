@@ -725,7 +725,16 @@ REGRAS RÍGIDAS:
     try {
       const params = new URLSearchParams({ studentId: String(studentId) });
       if (date) params.set('date', String(date));
-      if (subjects) params.set('subjects', String(subjects));
+
+      let activeSubjects = subjects;
+      if (!activeSubjects) {
+        const context = DailyBriefingListener.getContext(studentId);
+        if (context?.subjects && context.subjects.length > 0) {
+          activeSubjects = context.subjects.join(',');
+        }
+      }
+      if (activeSubjects) params.set('subjects', String(activeSubjects));
+
       const res = await fetch(`${METRICS_SERVICE_URL}/metrics/overview?${params.toString()}`);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar métricas de estudo' }));
@@ -742,10 +751,20 @@ REGRAS RÍGIDAS:
   });
 
   app.get('/api/metrics/schedule-adherence', async (request, reply) => {
-    const { studentId = 'anne-student-1', date } = (request.query as any) || {};
+    const { studentId = 'anne-student-1', date, subjects } = (request.query as any) || {};
     try {
       const params = new URLSearchParams({ studentId: String(studentId) });
       if (date) params.set('date', String(date));
+
+      let activeSubjects = subjects;
+      if (!activeSubjects) {
+        const context = DailyBriefingListener.getContext(studentId);
+        if (context?.subjects && context.subjects.length > 0) {
+          activeSubjects = context.subjects.join(',');
+        }
+      }
+      if (activeSubjects) params.set('subjects', String(activeSubjects));
+
       const res = await fetch(`${METRICS_SERVICE_URL}/metrics/schedule-adherence?${params.toString()}`);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar aderência do cronograma' }));
@@ -761,10 +780,20 @@ REGRAS RÍGIDAS:
   });
 
   app.get('/api/metrics/evolution', async (request, reply) => {
-    const { studentId = 'anne-student-1', date } = (request.query as any) || {};
+    const { studentId = 'anne-student-1', date, subjects } = (request.query as any) || {};
     try {
       const params = new URLSearchParams({ studentId: String(studentId) });
       if (date) params.set('date', String(date));
+
+      let activeSubjects = subjects;
+      if (!activeSubjects) {
+        const context = DailyBriefingListener.getContext(studentId);
+        if (context?.subjects && context.subjects.length > 0) {
+          activeSubjects = context.subjects.join(',');
+        }
+      }
+      if (activeSubjects) params.set('subjects', String(activeSubjects));
+
       const res = await fetch(`${METRICS_SERVICE_URL}/metrics/evolution?${params.toString()}`);
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Falha ao buscar métricas evolutivas' }));

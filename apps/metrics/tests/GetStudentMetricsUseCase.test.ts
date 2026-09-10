@@ -128,4 +128,49 @@ describe('GetStudentMetricsUseCase', () => {
     expect(metrics.evolutionary.studyStreakDays).toBe(2);
     expect(metrics.evolutionary.weeklyVelocity.length).toBe(7);
   });
+
+  it('deve ignorar matérias removidas/antigas quando input.subjects for especificado', async () => {
+    const repo = new InMemoryMetricsRepository();
+    const now = new Date('2026-09-10T12:00:00Z');
+
+    repo.materials = [
+      { id: 'mat-1', studentId: 'james-1', title: 'Anotações IA', subject: 'Fundamentos de IA e LLMs para Programadores' },
+      { id: 'mat-2', studentId: 'james-1', title: 'Anotações Francês', subject: 'Francês' },
+    ];
+
+    repo.schedules = [
+      {
+        id: 'sched-1',
+        studentId: 'james-1',
+        title: 'Cronograma',
+        items: [
+          {
+            id: 'item-ia',
+            date: new Date('2026-09-08T10:00:00Z'),
+            subject: 'Fundamentos de IA e LLMs para Programadores',
+            topic: 'Prompts Avançados',
+            completed: false,
+          },
+          {
+            id: 'item-frances',
+            date: new Date('2026-09-08T10:00:00Z'),
+            subject: 'Francês',
+            topic: 'Verbos no Passé Composé',
+            completed: true,
+          },
+        ],
+      },
+    ];
+
+    const usecase = new GetStudentMetricsUseCase(repo);
+    const metrics = await usecase.execute({
+      studentId: 'james-1',
+      asOfDate: now,
+      subjects: ['Francês'],
+    });
+
+    expect(metrics.subjectProgress).toHaveLength(1);
+    expect(metrics.subjectProgress[0].subjectName).toBe('Francês');
+    expect(metrics.pendingSummary.items.every((i) => i.subject === 'Francês')).toBe(true);
+  });
 });

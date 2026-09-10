@@ -15,7 +15,10 @@ export class MetricsController {
     }
 
     const asOfDate = date ? new Date(date) : undefined;
-    const allowedSubjects = typeof subjects === 'string' ? subjects.split(',') : undefined;
+    const allowedSubjects =
+      typeof subjects === 'string'
+        ? subjects.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
 
     try {
       const overview = await this.getStudentMetricsUseCase.execute({
@@ -34,7 +37,7 @@ export class MetricsController {
   };
 
   public getScheduleAdherence = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { studentId, date } = (request.query as any) || {};
+    const { studentId, date, subjects } = (request.query as any) || {};
 
     if (!studentId) {
       return reply.status(400).send({
@@ -43,10 +46,16 @@ export class MetricsController {
       });
     }
 
+    const allowedSubjects =
+      typeof subjects === 'string'
+        ? subjects.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
     try {
       const overview = await this.getStudentMetricsUseCase.execute({
         studentId,
         asOfDate: date ? new Date(date) : undefined,
+        subjects: allowedSubjects,
       });
 
       return reply.status(200).send(overview.scheduleAdherence);
@@ -59,7 +68,7 @@ export class MetricsController {
   };
 
   public getEvolution = async (request: FastifyRequest, reply: FastifyReply) => {
-    const { studentId, date } = (request.query as any) || {};
+    const { studentId, date, subjects } = (request.query as any) || {};
 
     if (!studentId) {
       return reply.status(400).send({
@@ -68,10 +77,16 @@ export class MetricsController {
       });
     }
 
+    const allowedSubjects =
+      typeof subjects === 'string'
+        ? subjects.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined;
+
     try {
       const overview = await this.getStudentMetricsUseCase.execute({
         studentId,
         asOfDate: date ? new Date(date) : undefined,
+        subjects: allowedSubjects,
       });
 
       return reply.status(200).send(overview.evolutionary);

@@ -166,14 +166,32 @@ export function Dashboard({ onNavigate }: DashboardProps) {
           }
 
           if (metricsData.subjectProgress && metricsData.subjectProgress.length > 0) {
-            progressRows = metricsData.subjectProgress.map((sp, idx) => ({
-              id: `c-${sp.subjectName}-${idx}`,
-              name: sp.subjectName,
-              color: colorPalette[idx % colorPalette.length],
-              progress: sp.progressPct,
-              topics: sp.topicsTotal,
-              reviewed: sp.topicsCompleted,
-            }))
+            const filteredSubjectProgress = subjects.length > 0
+              ? metricsData.subjectProgress.filter((sp) => subjects.includes(sp.subjectName))
+              : metricsData.subjectProgress
+
+            if (subjects.length > 0) {
+              progressRows = subjects.map((sub, idx) => {
+                const sp = filteredSubjectProgress.find((s) => s.subjectName === sub)
+                return {
+                  id: `c-${sub}-${idx}`,
+                  name: sub,
+                  color: colorPalette[idx % colorPalette.length],
+                  progress: sp ? sp.progressPct : 0,
+                  topics: sp ? sp.topicsTotal : 0,
+                  reviewed: sp ? sp.topicsCompleted : 0,
+                }
+              })
+            } else {
+              progressRows = filteredSubjectProgress.map((sp, idx) => ({
+                id: `c-${sp.subjectName}-${idx}`,
+                name: sp.subjectName,
+                color: colorPalette[idx % colorPalette.length],
+                progress: sp.progressPct,
+                topics: sp.topicsTotal,
+                reviewed: sp.topicsCompleted,
+              }))
+            }
           }
         }
 

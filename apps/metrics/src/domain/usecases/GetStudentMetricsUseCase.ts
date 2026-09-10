@@ -53,17 +53,30 @@ export class GetStudentMetricsUseCase {
     >();
 
     // Garantir matérias informadas no input ou dos materiais
-    const knownSubjects = new Set<string>(input.subjects || []);
-    materials.forEach((m) => {
-      if (m.subject) knownSubjects.add(m.subject);
-    });
+    const hasAllowedSubjects = Array.isArray(input.subjects);
+    const allowedSubjectsSet = hasAllowedSubjects
+      ? new Set((input.subjects || []).map((s) => s.trim()).filter(Boolean))
+      : null;
+
+    const knownSubjects = new Set<string>(
+      hasAllowedSubjects ? (input.subjects || []).map((s) => s.trim()).filter(Boolean) : []
+    );
+
+    if (!hasAllowedSubjects) {
+      materials.forEach((m) => {
+        if (m.subject) knownSubjects.add(m.subject);
+      });
+    }
 
     knownSubjects.forEach((sub) => {
       subjectStats.set(sub, { topicsTotal: 0, topicsCompleted: 0, overdueCount: 0 });
     });
 
     // 1. Processar itens do Cronograma
-    const allScheduleItems = schedules.flatMap((s) => s.items || []);
+    const rawScheduleItems = schedules.flatMap((s) => s.items || []);
+    const allScheduleItems = allowedSubjectsSet
+      ? rawScheduleItems.filter((item) => item.subject && allowedSubjectsSet.has(item.subject))
+      : rawScheduleItems;
 
     for (const item of allScheduleItems) {
       const itemDate = new Date(item.date);
@@ -119,7 +132,16 @@ export class GetStudentMetricsUseCase {
     let dueFlashcardsCount = 0;
     const dueFlashcardsMapBySubject = new Map<string, number>();
 
-    for (const card of flashcards) {
+    const validFlashcards = allowedSubjectsSet
+      ? flashcards.filter((card) => {
+          const matSubject = card.materialId
+            ? materialSubjectMap.get(card.materialId)
+            : undefined;
+          return matSubject ? allowedSubjectsSet.has(matSubject) : true;
+        })
+      : flashcards;
+
+    for (const card of validFlashcards) {
       const nextReview = new Date(card.nextReviewDate);
       if (nextReview <= now) {
         dueFlashcardsCount += 1;
@@ -230,7 +252,7 @@ export class GetStudentMetricsUseCase {
         allScheduleItems.some(
           (item) => item.completed && item.completedAt && new Date(item.completedAt) >= checkStart && new Date(item.completedAt) <= checkEnd
         ) ||
-        flashcards.some((card) =>
+        validFlashcards.some((card) =>
           card.history?.some(
             (h) => new Date(h.reviewedAt) >= checkStart && new Date(h.reviewedAt) <= checkEnd
           )
@@ -247,7 +269,7 @@ export class GetStudentMetricsUseCase {
     // 6. Taxa de Retenção Média (baseada nas notas dos flashcards)
     let totalGrades = 0;
     let countGrades = 0;
-    flashcards.forEach((card) => {
+    validFlashcards.forEach((card) => {
       card.history?.forEach((h) => {
         totalGrades += h.grade;
         countGrades += 1;
