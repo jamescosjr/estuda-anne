@@ -1,0 +1,30 @@
+{
+  "protect-paths": {
+    "PreToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'if [ -f .agents/hooks/protect-paths.py ]; then python3 .agents/hooks/protect-paths.py; else python3 hooks/protect-paths.py; fi'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
+  "guard-bash": {
+    "PreToolUse": [
+      {
+        "matcher": "run_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'if [ -f .agents/hooks/guard-bash.py ]; then python3 .agents/hooks/guard-bash.py; else python3 hooks/guard-bash.py; fi'",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

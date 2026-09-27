@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Flashcard } from '../../src/domain/entities/Flashcard.js';
 
-describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
-  it('should initialize with default ease factor and interval of 1 day', () => {
+describe('RN-STU-001 & RN-STU-002: Flashcard Entity & Spaced Repetition (SM-2)', () => {
+  it('RN_STU_001_WHEN_criado_SHALL_inicializar_com_EF_2_5_e_intervalo_1', () => {
     const card = Flashcard.create({
       studentId: 'student-123',
       materialId: 'material-456',
@@ -19,7 +19,7 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
     expect(card.history).toHaveLength(0);
   });
 
-  it('should advance intervals correctly on successive correct reviews (grade >= 3)', () => {
+  it('RN_STU_002_WHEN_nota_maior_igual_3_SHALL_avancar_intervalo_e_recalcular_EF', () => {
     const card = Flashcard.create({
       studentId: 'student-123',
       materialId: 'material-456',
@@ -48,7 +48,7 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
     expect(card.repetitionIntervalDays).toBe(16);
   });
 
-  it('should reset repetitions on memory lapse (grade < 3) but retain history', () => {
+  it('RN_STU_002_IF_nota_menor_3_THEN_SHALL_resetar_repeticoes_para_zero', () => {
     const card = Flashcard.create({
       studentId: 'student-123',
       materialId: 'material-456',
@@ -68,7 +68,7 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
     expect(card.history).toHaveLength(3);
   });
 
-  it('should never let ease factor drop below minimum threshold (1.3)', () => {
+  it('RN_STU_002_SHALL_manter_piso_minimo_EF_de_1_3', () => {
     const card = Flashcard.create({
       studentId: 'student-123',
       materialId: 'material-456',
@@ -85,7 +85,7 @@ describe('Flashcard Entity & Spaced Repetition (SM-2)', () => {
     expect(card.easeFactor).toBeGreaterThanOrEqual(1.3);
   });
 
-  it('should discard temporary fc-gen- or fc- ID prefix and generate a real UUID', () => {
+  it('RN_STU_001_WHEN_id_temporario_SHALL_gerar_UUID_valido', () => {
     const card = Flashcard.create({
       id: 'fc-gen-Calculo-1',
       studentId: 'student-123',

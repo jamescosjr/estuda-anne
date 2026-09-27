@@ -8,6 +8,10 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "test": "turbo test",
+    "test:regra": "pnpm --filter @estuda-anne/study-engine test -t 'RN_'",
+    "test:arch": "pnpm --filter @estuda-anne/study-engine test tests/domain/Architecture.test.ts",
+    "gate": "pnpm build && pnpm test",
+    "format": "prettier --write .",
     "clean": "turbo clean"
   },
   "devDependencies": {
