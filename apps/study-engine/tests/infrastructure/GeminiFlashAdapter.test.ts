@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { GoogleAIFileManager, GoogleAICacheManager } from '@google/generative-ai/server';
 import { GeminiFlashAdapter } from '../../src/infrastructure/ai/GeminiFlashAdapter.js';
 
 describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
@@ -241,7 +242,7 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       const cacheHandle = {
         cache: {
           name: 'cachedContents/test-123',
-          model: 'models/gemini-1.5-flash-001',
+          model: 'models/gemini-3.6-flash',
         },
         file: {
           name: 'files/test-file-123',
@@ -252,6 +253,36 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       expect(result.summary).toBe('Resumo via cache de contexto.');
       expect(result.keyConcepts).toEqual(['dijkstra', 'caminho minimo']);
       expect(mockFetch).toHaveBeenCalledOnce();
+    });
+
+    it('REQ_04_WHEN_create_context_cache_for_chamado_SHALL_usar_modelo_gemini_3_6_flash', async () => {
+      const uploadSpy = vi.spyOn(GoogleAIFileManager.prototype, 'uploadFile').mockResolvedValue({
+        file: {
+          name: 'files/uploaded-123',
+          uri: 'https://generativelanguage.googleapis.com/v1beta/files/uploaded-123',
+          mimeType: 'text/plain',
+        },
+      } as any);
+
+      const createCacheSpy = vi.spyOn(GoogleAICacheManager.prototype, 'create').mockResolvedValue({
+        name: 'cachedContents/cache-123',
+        model: 'models/gemini-3.6-flash',
+      } as any);
+
+      const adapter = new GeminiFlashAdapter(mockApiKey);
+      const handle = await adapter.createContextCache({
+        textContent: sampleMaterial,
+        fileName: 'dijkstra.txt',
+      });
+
+      expect(uploadSpy).toHaveBeenCalledOnce();
+      expect(createCacheSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          model: 'models/gemini-3.6-flash',
+          ttlSeconds: 600,
+        })
+      );
+      expect(handle?.cache?.model).toBe('models/gemini-3.6-flash');
     });
 
     it('deve retornar null em createContextCache quando nao houver apiKey', async () => {

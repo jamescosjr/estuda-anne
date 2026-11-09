@@ -33,6 +33,9 @@ export class MongoConnection {
       maxPoolSize: 10,
       minPoolSize: 1,
       serverSelectionTimeoutMS: 15000,
+      maxIdleTimeMS: 30000,
+      socketTimeoutMS: 30000,
+      connectTimeoutMS: 10000,
     });
 
     try {

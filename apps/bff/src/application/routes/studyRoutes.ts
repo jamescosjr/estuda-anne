@@ -55,7 +55,9 @@ export async function studyRoutes(app: FastifyInstance) {
   const getMaterialsHandler = async (request: any, reply: any) => {
     const { studentId = 'anne-student-1' } = (request.query as any) || {};
     try {
-      const res = await fetch(`${STUDY_ENGINE_URL}/materials?studentId=${encodeURIComponent(studentId)}`);
+      const res = await fetch(`${STUDY_ENGINE_URL}/materials?studentId=${encodeURIComponent(studentId)}`, {
+        signal: AbortSignal.timeout(15000),
+      });
       if (!res.ok) {
         if (res.status === 404) {
           return reply.status(200).send([]);
@@ -82,6 +84,7 @@ export async function studyRoutes(app: FastifyInstance) {
     try {
       const res = await fetch(`${STUDY_ENGINE_URL}/materials/${id}`, {
         method: 'DELETE',
+        signal: AbortSignal.timeout(15000),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Erro ao deletar material' }));
@@ -104,7 +107,9 @@ export async function studyRoutes(app: FastifyInstance) {
   const getMaterialByIdHandler = async (request: any, reply: any) => {
     const { id } = request.params as any;
     try {
-      const res = await fetch(`${STUDY_ENGINE_URL}/materials/${encodeURIComponent(id)}`);
+      const res = await fetch(`${STUDY_ENGINE_URL}/materials/${encodeURIComponent(id)}`, {
+        signal: AbortSignal.timeout(15000),
+      });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({ message: 'Material não encontrado' }));
         return reply.status(res.status).send(errJson);
@@ -149,6 +154,7 @@ export async function studyRoutes(app: FastifyInstance) {
           mimeType,
           rawContent: typeof content === 'string' && content.trim().length > 10 ? content : undefined,
         }),
+        signal: AbortSignal.timeout(15000),
       });
 
       if (!createRes.ok) {
@@ -172,6 +178,7 @@ export async function studyRoutes(app: FastifyInstance) {
           fileName: title,
           async: true,
         }),
+        signal: AbortSignal.timeout(15000),
       });
 
       const processResult = await processRes.json().catch(() => null);

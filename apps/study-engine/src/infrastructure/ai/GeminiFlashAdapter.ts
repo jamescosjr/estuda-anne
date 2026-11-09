@@ -143,7 +143,7 @@ export class GeminiFlashAdapter implements ILanguageModelService {
 
       // 2. Criação do Cache via GoogleAICacheManager (10 min TTL)
       const cache = await cacheManager.create({
-        model: 'models/gemini-1.5-flash-001',
+        model: 'models/gemini-3.6-flash',
         contents: [
           {
             role: 'user',

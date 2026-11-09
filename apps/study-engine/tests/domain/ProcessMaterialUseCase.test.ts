@@ -251,7 +251,7 @@ describe('ProcessMaterialUseCase', () => {
     material.setRawContent('O principio da incerteza de Heisenberg estabelece limites para a precisao de medidas simultaneas de posicao e momento.');
 
     const mockCacheHandle = {
-      cache: { name: 'cachedContents/fisica-cache-123', model: 'models/gemini-1.5-flash-001' },
+      cache: { name: 'cachedContents/fisica-cache-123', model: 'models/gemini-3.6-flash' },
       file: { name: 'files/fisica-file-123' },
     };
 
