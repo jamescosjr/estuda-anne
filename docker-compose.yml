@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # Mongo local opcional (dev): docker compose --profile local-db up
   # Em produção o app usa só MONGODB_URI do .env (Atlas). Não subir este serviço.
@@ -5,6 +11,7 @@ services:
     image: mongo:7.0
     container_name: estuda-anne-mongo
     restart: always
+    logging: *default-logging
     profiles:
       - local-db
     ports:
@@ -23,6 +30,7 @@ services:
       dockerfile: Dockerfile.auth
     container_name: estuda-anne-auth
     restart: always
+    logging: *default-logging
     ports:
       - "9005:3005"
     env_file:
@@ -40,6 +48,7 @@ services:
       dockerfile: Dockerfile.study-engine
     container_name: estuda-anne-study-engine
     restart: always
+    logging: *default-logging
     ports:
       - "9002:3002"
     env_file:
@@ -57,6 +66,7 @@ services:
       dockerfile: Dockerfile.metrics
     container_name: estuda-anne-metrics
     restart: always
+    logging: *default-logging
     ports:
       - "9004:3004"
     env_file:
@@ -74,6 +84,7 @@ services:
       dockerfile: Dockerfile.bff
     container_name: estuda-anne-bff
     restart: always
+    logging: *default-logging
     ports:
       - "9001:3001"
     env_file:
@@ -102,6 +113,7 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://estuda-anne.singulartech.space}
     container_name: estuda-anne-frontend
     restart: always
+    logging: *default-logging
     ports:
       - "9000:9000"
     env_file:
@@ -123,6 +135,7 @@ services:
     image: nginx:alpine
     container_name: estuda-anne-nginx
     restart: always
+    logging: *default-logging
     expose:
       - "80"
     volumes:

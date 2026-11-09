@@ -57,7 +57,15 @@ jobs:
           script: |
             set -eu
             echo "Starting deploy on VPS..."
-            cd /opt/estuda-anne
+            if [ -d /srv/estuda-anne ]; then
+              APP_DIR="/srv/estuda-anne"
+            elif [ -d /opt/estuda-anne ]; then
+              APP_DIR="/opt/estuda-anne"
+            else
+              echo "ERROR: neither /srv/estuda-anne nor /opt/estuda-anne exists on VPS"
+              exit 1
+            fi
+            cd "$APP_DIR"
             git fetch origin main
             git checkout main
             git pull --ff-only origin main
@@ -66,7 +74,7 @@ jobs:
             docker compose up -d --build
             docker compose ps
             if [ -d /etc/nginx/conf.d ]; then
-              if cp /opt/estuda-anne/nginx/host-vps-upload.conf /etc/nginx/conf.d/estuda-anne-upload.conf; then
+              if cp "$APP_DIR/nginx/host-vps-upload.conf" /etc/nginx/conf.d/estuda-anne-upload.conf; then
                 nginx -t
                 systemctl reload nginx || service nginx reload
                 echo "Host nginx client_max_body_size set to 100m"

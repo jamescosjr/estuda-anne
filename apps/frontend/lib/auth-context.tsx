@@ -50,6 +50,34 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 const STORAGE_KEY_USER = 'estuda_anne_user'
 const STORAGE_KEY_TOKEN = 'estuda_anne_token'
 
+export function isJwtTokenValid(rawToken: string | null | undefined): rawToken is string {
+  if (!rawToken || typeof rawToken !== 'string') return false
+  const trimmed = rawToken.trim()
+  if (!trimmed) return false
+
+  const parts = trimmed.split('.')
+  if (parts.length !== 3 || parts.some((part) => part.length === 0)) {
+    return false
+  }
+
+  try {
+    const base64Url = parts[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=')
+    const payload = JSON.parse(atob(padded)) as { exp?: unknown }
+
+    if (typeof payload.exp === 'number') {
+      const nowSeconds = Math.floor(Date.now() / 1000)
+      if (payload.exp <= nowSeconds + 5) {
+        return false
+      }
+    }
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const DEMO_STUDENT: User = {
   id: 'student-demo-id',
   name: 'Ana Nogueira',
@@ -89,14 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const storedUser = localStorage.getItem(STORAGE_KEY_USER)
       const storedToken = localStorage.getItem(STORAGE_KEY_TOKEN)
-      if (storedUser && storedToken) {
+      if (storedUser && isJwtTokenValid(storedToken)) {
         setUser(JSON.parse(storedUser))
         setToken(storedToken)
       } else {
+        localStorage.removeItem(STORAGE_KEY_USER)
+        localStorage.removeItem(STORAGE_KEY_TOKEN)
         setUser(null)
         setToken(null)
       }
     } catch {
+      localStorage.removeItem(STORAGE_KEY_USER)
+      localStorage.removeItem(STORAGE_KEY_TOKEN)
       setUser(null)
       setToken(null)
     } finally {
@@ -168,6 +200,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }): Promise<{ success: boolean; error?: string }> {
     if (!user) return { success: false, error: 'Usuário não autenticado' }
 
+    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_TOKEN) : null)
+    if (!isJwtTokenValid(activeToken)) {
+      logout()
+      return {
+        success: false,
+        error: 'Sua sessão expirou ou é inválida. Faça login novamente para salvar suas matérias no perfil.',
+      }
+    }
+
     const updatedUser: User = {
       ...user,
       name: profileData.name !== undefined ? profileData.name : user.name,
@@ -190,12 +231,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: token ? `Bearer ${token}` : '',
+          Authorization: `Bearer ${activeToken}`,
         },
         body: JSON.stringify(profileData),
       })
 
       const data = await response.json().catch(() => null)
+      if (response.status === 401) {
+        logout()
+        return {
+          success: false,
+          error:
+            data?.message ||
+            'Sua sessão expirou ou é inválida. Faça login novamente para salvar suas matérias no perfil.',
+        }
+      }
+
       if (!response.ok) {
         return {
           success: false,
@@ -219,7 +270,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isProfileComplete: data.isProfileComplete ?? updatedUser.isProfileComplete,
       }
 
-      saveAuthSession(persisted, token || '')
+      saveAuthSession(persisted, activeToken)
       return { success: true }
     } catch (err) {
       console.error('Erro ao persistir perfil:', err)

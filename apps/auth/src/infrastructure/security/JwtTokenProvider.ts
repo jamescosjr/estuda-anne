@@ -21,8 +21,15 @@ export class JwtTokenProvider implements ITokenProvider {
         email: decoded.email,
         role: decoded.role,
       };
-    } catch {
-      throw new Error('Token inválido ou expirado');
+    } catch (err: any) {
+      if (err?.name === 'TokenExpiredError') {
+        const expiredErr = new Error('Token expirado');
+        expiredErr.name = 'TokenExpiredError';
+        throw expiredErr;
+      }
+      const invalidErr = new Error('Token inválido ou expirado');
+      invalidErr.name = err?.name || 'JsonWebTokenError';
+      throw invalidErr;
     }
   }
 }

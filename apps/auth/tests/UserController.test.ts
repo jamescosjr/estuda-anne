@@ -55,4 +55,55 @@ describe('UserController HTTP Routes', () => {
     expect(body.page).toBe(1);
     expect(body.limit).toBe(5);
   });
+
+  it('deve responder 401 com MISSING_AUTH_HEADER ao atualizar perfil sem cabeçalho Authorization', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/users/profile',
+      payload: { subjects: ['Fisiologia'] },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      error: 'Unauthorized',
+      code: 'MISSING_AUTH_HEADER',
+      reason: 'missing_authorization_header',
+    });
+  });
+
+  it('deve responder 401 com MALFORMED_AUTH_HEADER quando Authorization não começa com Bearer', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/users/profile',
+      headers: {
+        authorization: 'Basic token-invalido',
+      },
+      payload: { subjects: ['Fisiologia'] },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      error: 'Unauthorized',
+      code: 'MALFORMED_AUTH_HEADER',
+      reason: 'malformed_authorization_header',
+    });
+  });
+
+  it('deve responder 401 com INVALID_TOKEN quando o token enviado é inválido ou de sessão demo', async () => {
+    const res = await app.inject({
+      method: 'PUT',
+      url: '/users/profile',
+      headers: {
+        authorization: 'Bearer demo-token-student',
+      },
+      payload: { subjects: ['Fisiologia'] },
+    });
+
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toMatchObject({
+      error: 'Unauthorized',
+      code: 'INVALID_TOKEN',
+      reason: 'invalid_token',
+    });
+  });
 });
