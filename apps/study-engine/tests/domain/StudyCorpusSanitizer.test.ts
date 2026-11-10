@@ -7,6 +7,8 @@ import {
   isGenericPlaceholderPrompt,
   isUnusableStudyCorpus,
   materialHasStudyCorpus,
+  isGroundedInCorpus,
+  filterTopicsGroundedInCorpus,
 } from '../../src/domain/services/StudyCorpusSanitizer.js';
 
 describe('StudyCorpusSanitizer', () => {
@@ -100,5 +102,59 @@ describe('StudyCorpusSanitizer', () => {
       )
     ).toBe(false);
     expect(materialHasStudyCorpus('Le present de l indicatif se forme avec les terminaisons e es e ons ez ent.', undefined)).toBe(true);
+  });
+
+  it('RN_STU_005_WHEN_corpus_or_card_mentions_corrupted_or_unreadable_file_bytes_SHALL_reject_as_unusable_and_off_topic', () => {
+    const hematologiaCorruptedFront =
+      'O que caracteriza um arquivo de dados biomédicos classificado como corrompido ou ilegível nos Sistemas de Informação Laboratorial (LIS) em hematologia?';
+    const hematologiaCorruptedBack =
+      'Um arquivo corrompido ou ilegível é aquele cuja estrutura de bytes original sofreu alteração involuntária ou degradação de dados, impedindo que os softwares analíticos interpretem seu cabeçalho ou conteúdo. Isso inviabiliza o processamento automático de dados de amostragem celular, histogramas hematológicos e imagens de citometria.';
+
+    expect(isDocumentMetaReferencing(hematologiaCorruptedFront)).toBe(true);
+    expect(isDocumentMetaReferencing(hematologiaCorruptedBack)).toBe(true);
+    expect(isPedagogicallyOffTopic(hematologiaCorruptedFront)).toBe(true);
+    expect(isPedagogicallyOffTopic(hematologiaCorruptedBack)).toBe(true);
+
+    expect(
+      isUnusableStudyCorpus(
+        'Não foi possível ler o arquivo enviado pois o documento encontra-se corrompido ou ilegível, apresentando falha na estrutura de bytes.'
+      )
+    ).toBe(true);
+  });
+
+  it('RN_STU_007_WHEN_evaluating_grounding_SHALL_require_lexical_overlap_with_uploaded_material_corpus', () => {
+    const hematologiaCorpus =
+      'A eritropoiese ocorre na medula óssea vermelha sob estímulo da eritropoietina renal. Os reticulócitos são eritrócitos jovens liberados na corrente sanguínea contendo RNA residual. A hemoglobina transporta oxigênio ligado ao grupo heme ferroso.';
+
+    expect(
+      isGroundedInCorpus(
+        'Onde ocorre a eritropoiese e qual hormônio a estimula? Na medula óssea sob estímulo da eritropoietina.',
+        hematologiaCorpus,
+        ['eritropoiese', 'eritropoietina', 'reticulócitos']
+      )
+    ).toBe(true);
+
+    // Card inventado sobre Sistemas de Informação Laboratorial (LIS) e bytes sem ancoragem no texto real de hematologia
+    expect(
+      isGroundedInCorpus(
+        'O que caracteriza um arquivo classificado como corrompido nos Sistemas de Informação Laboratorial (LIS)? Alteração de bytes no cabeçalho.',
+        hematologiaCorpus,
+        ['eritropoiese', 'eritropoietina', 'reticulócitos']
+      )
+    ).toBe(false);
+
+    // Filtra focusTopics de outras matérias (ex: Direito Constitucional, Cálculo) mantendo apenas os do corpus
+    const mixedTopics = [
+      { topic: 'Controle de Constitucionalidade', priorityWeight: 2.8 },
+      { topic: 'Integrais Duplas', priorityWeight: 2.5 },
+      { topic: 'Eritropoiese e Reticulócitos', priorityWeight: 2.2 },
+    ];
+    const filteredTopics = filterTopicsGroundedInCorpus(mixedTopics, hematologiaCorpus, [
+      'eritropoiese',
+      'reticulócitos',
+    ]);
+
+    expect(filteredTopics).toHaveLength(1);
+    expect(filteredTopics[0].topic).toBe('Eritropoiese e Reticulócitos');
   });
 });

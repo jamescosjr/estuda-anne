@@ -14,6 +14,7 @@ import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpeciali
 import { QualityGateAgent } from '../services/pedagogical-agents/QualityGateAgent.js';
 import { PedagogicalCoordinatorAgent } from '../services/pedagogical-agents/PedagogicalCoordinatorAgent.js';
 import { isUnusableStudyCorpus } from '../services/StudyCorpusSanitizer.js';
+import { DomainRuleViolation } from '../errors/DomainError.js';
 
 export interface ProcessMaterialInput {
   materialId: string;
@@ -139,7 +140,10 @@ export class ProcessMaterialUseCase {
       }
 
       if (!rawText || rawText.trim().length === 0 || isUnusableStudyCorpus(rawText)) {
-        throw new Error('Não foi possível extrair texto do arquivo (PDF sem camada de texto, DOCX/ZIP binário ou digitalizado). Envie um documento com texto selecionável ou um .docx válido.');
+        throw new DomainRuleViolation(
+          'RN-STU-005',
+          'corpus_invalido_ou_inseguro: Não foi possível extrair texto do arquivo (PDF sem camada de texto, DOCX/ZIP binário ou digitalizado). Envie um documento com texto selecionável ou um .docx válido.'
+        );
       }
 
       material.setRawContent(rawText);

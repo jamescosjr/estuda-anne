@@ -242,6 +242,11 @@ export class GeminiFlashAdapter implements ILanguageModelService {
 Analise o material de estudo enviado no contexto em cache.
 Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
 
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- Extraia o resumo e os conceitos-chave ÚNICA E EXCLUSIVAMENTE do conteúdo acadêmico presente no material enviado pelo usuário.
+- PROIBIDO usar conhecimento externo ao material ou misturar assuntos de outras disciplinas.
+- NUNCA gere conceitos ou resumos sobre "arquivo corrompido", "ilegível", "estrutura de bytes" ou "cabeçalho de arquivo".
+
 REGRAS DE QUALIDADE:
 - Resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
 - Até 5 conceitos-chave essenciais, priorizando os que mais caem em prova.
@@ -267,6 +272,11 @@ Formato esperado:
     const prompt = `Você é um coordenador pedagógico especialista em microlearning.
 Analise o seguinte material de estudo universitário.
 Ignore metadados de arquivo (autor, CreationDate, datas ISO/Node, nome do PDF).
+
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- Extraia o resumo e os conceitos-chave ÚNICA E EXCLUSIVAMENTE do conteúdo acadêmico presente no texto do material abaixo.
+- PROIBIDO usar conhecimento externo ao material ou misturar assuntos de outras disciplinas.
+- NUNCA gere conceitos ou resumos sobre "arquivo corrompido", "ilegível", "estrutura de bytes" ou "cabeçalho de arquivo".
 
 REGRAS DE QUALIDADE:
 - Resumo estruturado e conciso dos CONCEITOS da matéria (não da aluna).
@@ -379,6 +389,11 @@ ${content.slice(0, 10000)}`;
       const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO do material em cache, nunca sobre o documento.
 
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- TODO flashcard (pergunta e resposta) DEVE ser extraído ÚNICA E EXCLUSIVAMENTE do material enviado pelo usuário.
+- É ESTRITAMENTE PROIBIDO usar conhecimento externo que não esteja escrito no material enviado ou misturar conceitos de outras matérias.
+- NUNCA invente perguntas sobre "arquivo corrompido", "ilegível", "estrutura de bytes", "cabeçalho de arquivo" ou "Sistemas de Informação Laboratorial (LIS)" se isso não for o tema literal escrito pelo autor no texto.
+
 MATRIZ DE DIVERSIDADE PEDAGÓGICA (Obrigatório distribuir os ${count} flashcards entre estes ângulos cognitivos):
 - CARD 1 (Definição & Conceito Fundamental): Foque na essência teórica e significado atômico do principal conceito.
 - CARD 2 (Mecanismo & Funcionamento Interno): Explique o 'como funciona' ou o processo interno por trás do conceito.
@@ -411,6 +426,11 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     } else {
       const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico profissional.
 Gere flashcards atômicos, profundos e totalmente inéditos sobre o CONTEÚDO da matéria, nunca sobre o documento.
+
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- TODO flashcard (pergunta e resposta) DEVE ser extraído ÚNICA E EXCLUSIVAMENTE do MATERIAL BASE enviado pelo usuário abaixo.
+- É ESTRITAMENTE PROIBIDO usar conhecimento externo que não esteja escrito no MATERIAL BASE ou misturar conceitos de outras matérias.
+- NUNCA invente perguntas sobre "arquivo corrompido", "ilegível", "estrutura de bytes", "cabeçalho de arquivo" ou "Sistemas de Informação Laboratorial (LIS)" se isso não for o tema literal escrito pelo autor no texto.
 
 MATRIZ DE DIVERSIDADE PEDAGÓGICA (Obrigatório distribuir os ${count} flashcards entre estes ângulos cognitivos):
 - CARD 1 (Definição & Conceito Fundamental): Foque na essência teórica e significado atômico do principal conceito.
@@ -554,6 +574,11 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
 
       const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO do material em cache.
 
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- TODA questão, alternativa correta e explicação DEVE ser extraída ÚNICA E EXCLUSIVAMENTE do material enviado pelo usuário.
+- É ESTRITAMENTE PROIBIDO usar conhecimento externo que não esteja escrito no material enviado ou misturar conceitos de outras disciplinas.
+- NUNCA crie questões sobre "arquivo corrompido", "ilegível", "estrutura de bytes" ou "cabeçalho de arquivo".
+
 REGRAS DE QUALIDADE:
 1. As perguntas devem ser curtas e instigantes.
 2. Evite jargões desnecessários.
@@ -591,6 +616,11 @@ Você deve retornar ESTRITAMENTE um JSON válido. Não use formatação markdown
     } else {
       const prompt = `Você é um coordenador pedagógico especialista em microlearning acadêmico. Gere questões de prova sobre o CONTEÚDO da matéria. A audiência é uma estudante, mas ela NÃO é o tema das perguntas.
 
+FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO):
+- TODA questão, alternativa correta e explicação DEVE ser extraída ÚNICA E EXCLUSIVAMENTE do MATERIAL BASE enviado pelo usuário abaixo.
+- É ESTRITAMENTE PROIBIDO usar conhecimento externo que não esteja escrito no MATERIAL BASE ou misturar conceitos de outras disciplinas.
+- NUNCA crie questões sobre "arquivo corrompido", "ilegível", "estrutura de bytes" ou "cabeçalho de arquivo".
+
 REGRAS DE QUALIDADE:
 1. As perguntas devem ser curtas e instigantes.
 2. Evite jargões desnecessários.
@@ -613,8 +643,8 @@ Se houver tópicos com peso maior, concentre ~60% neles e mantenha ~40% no resta
 
 PROIBIDO:
 - Mencionar "Anne", a aluna, ou transformar a estudante em personagem do enunciado.
-- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura técnica de contêiner de arquivo (PDF, páginas, itens, "objeto 14", "stream de dados").
-- Se o material tratar de computação forense ou assinaturas de arquivo, formule a pergunta de forma 100% TEÓRICA e CONCEITUAL sobre a disciplina (ex: "Qual o propósito da assinatura binária FF D8 FF E0 no cabeçalho de um arquivo de imagem?"), NUNCA citando "objeto X" ou "no arquivo enviado".
+- Perguntar sobre autor, data, CreationDate, ISO/Node date, metadados ou estrutura técnica de contêiner de arquivo (PDF, páginas, itens, "objeto 14", "stream de dados", "arquivo corrompido", "ilegível", "estrutura de bytes", "cabeçalho de arquivo").
+- Usar qualquer informação externa que não conste explicitamente no MATERIAL BASE enviado pelo usuário.
 - Interpretação de uma linha isolada de cabeçalho/rodapé de arquivo.
 
 ESTRUTURA E FORMATO DE SAÍDA:
@@ -824,6 +854,7 @@ Formato JSON estrito esperado:
 
       const prompt = `Você é um coordenador pedagógico especialista em microlearning.
 Extraia e transcreva todo o texto e conteúdo acadêmico relevante presente neste documento/imagem/PDF.
+Se o arquivo estiver ilegível, corrompido ou sem texto acadêmico visível, retorne APENAS uma string vazia "", NUNCA descreva que o arquivo está corrompido ou ilegível.
 Retorne APENAS o texto extraído do material na íntegra, sem formatação markdown extra nem saudações.`;
 
       // 4. Configura timeout de 120.000 ms (120 segundos)

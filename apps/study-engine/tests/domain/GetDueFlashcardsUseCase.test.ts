@@ -152,4 +152,43 @@ describe('GetDueFlashcardsUseCase', () => {
     expect(result.cards[0].front).toContain('antebraço');
     expect(result.cards.some((c) => c.front.includes('derivada'))).toBe(false);
   });
+
+  it('RN_STU_007_WHEN_fetching_due_flashcards_SHALL_filter_out_corrupted_file_or_meta_referencing_cards_from_bank', async () => {
+    const validHema = Flashcard.create({
+      studentId: 'anne',
+      materialId: 'mat-hema',
+      front: 'Onde ocorre a eritropoiese e qual hormônio a estimula?',
+      back: 'Ocorre na medula óssea vermelha sob estímulo da eritropoietina renal.',
+      tags: ['Hematologia I'],
+    });
+    const corruptedHema = Flashcard.create({
+      studentId: 'anne',
+      materialId: 'mat-hema',
+      front:
+        'O que caracteriza um arquivo de dados biomédicos classificado como corrompido ou ilegível nos Sistemas de Informação Laboratorial (LIS) em hematologia?',
+      back:
+        'Um arquivo corrompido ou ilegível é aquele cuja estrutura de bytes original sofreu alteração involuntária ou degradação de dados, impedindo que os softwares analíticos interpretem seu cabeçalho ou conteúdo.',
+      tags: ['Hematologia I'],
+    });
+
+    const useCase = new GetDueFlashcardsUseCase({
+      save: vi.fn(),
+      saveMany: vi.fn(),
+      findById: vi.fn(),
+      findByStudentId: vi.fn().mockResolvedValue([validHema, corruptedHema]),
+      findDueCards: vi.fn().mockResolvedValue([validHema, corruptedHema]),
+      findByMaterialId: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    });
+
+    const result = await useCase.execute({ studentId: 'anne', limit: 10 });
+
+    expect(result.cards).toHaveLength(1);
+    expect(result.cards[0].front).toContain('eritropoiese');
+    expect(result.cards.some((c) => c.front.includes('corrompido') || c.back.includes('estrutura de bytes'))).toBe(
+      false
+    );
+  });
 });

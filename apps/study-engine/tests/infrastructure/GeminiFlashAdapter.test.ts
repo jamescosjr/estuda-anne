@@ -210,6 +210,50 @@ describe('GeminiFlashAdapter - Refatoração Pedagógica de IA', () => {
       await expect(adapter.generateFlashcards(sampleMaterial, 1)).rejects.toThrow(/400/);
       expect(mockFetch).toHaveBeenCalledOnce();
     });
+
+    it('RN_STU_007_WHEN_generating_flashcards_and_quiz_SHALL_enforce_strict_grounding_prompt_and_strip_corrupted_file_hallucinations', async () => {
+      const capturedBodies: any[] = [];
+
+      const mockFetch = vi.fn().mockImplementation(async (_url: string, init?: RequestInit) => {
+        capturedBodies.push(JSON.parse(init?.body as string));
+        return {
+          ok: true,
+          json: async () => ({
+            candidates: [
+              {
+                content: {
+                  parts: [
+                    {
+                      text: JSON.stringify([
+                        {
+                          front:
+                            'O que caracteriza um arquivo de dados biomédicos classificado como corrompido ou ilegível nos Sistemas de Informação Laboratorial (LIS) em hematologia?',
+                          back: 'Um arquivo corrompido ou ilegível é aquele cuja estrutura de bytes original sofreu alteração involuntária.',
+                        },
+                        {
+                          front: 'Qual estrutura de dados o Algoritmo de Dijkstra utiliza para escolher o próximo nó?',
+                          back: 'Utiliza uma fila de prioridade para selecionar o nó não visitado com a menor distância provisória.',
+                        },
+                      ]),
+                    },
+                  ],
+                },
+              },
+            ],
+          }),
+        };
+      });
+
+      vi.stubGlobal('fetch', mockFetch);
+      const adapter = new GeminiFlashAdapter(mockApiKey);
+      const cards = await adapter.generateFlashcards(sampleMaterial, 2);
+
+      const promptText = capturedBodies[0].contents[0].parts[0].text;
+      expect(promptText).toContain('FONTE ÚNICA E EXCLUSIVA (GROUNDING ESTRITO)');
+      expect(promptText).toContain('PROIBIDO usar conhecimento externo');
+      expect(cards).toHaveLength(1);
+      expect(cards[0].front).toContain('Dijkstra');
+    });
   });
 
   describe('Gemini Context Caching', () => {

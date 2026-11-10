@@ -6,7 +6,11 @@ import {
   questionMatchesTopic,
   QuizBankItem,
 } from '../services/QuizStudySession.js';
-import { isGenericPlaceholderPrompt, isPedagogicallyOffTopic } from '../services/StudyCorpusSanitizer.js';
+import {
+  isDocumentMetaReferencing,
+  isGenericPlaceholderPrompt,
+  isPedagogicallyOffTopic,
+} from '../services/StudyCorpusSanitizer.js';
 
 export interface GetQuizSessionInput {
   studentId: string;
@@ -41,6 +45,7 @@ export class GetQuizSessionUseCase {
       (item) =>
         questionMatchesTopic(item, input.topic, input.allowedSubjects) &&
         !isGenericPlaceholderPrompt(item.prompt) &&
+        !isDocumentMetaReferencing(item.prompt) &&
         !isPedagogicallyOffTopic(item.prompt)
     );
 

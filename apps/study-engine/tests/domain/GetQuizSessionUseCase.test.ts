@@ -67,4 +67,48 @@ describe('GetQuizSessionUseCase', () => {
     const subjects = new Set(result.questions.map((q) => q.subject));
     expect(subjects.size).toBeGreaterThanOrEqual(2);
   });
+
+  it('RN_STU_007_WHEN_fetching_quiz_session_SHALL_filter_out_corrupted_file_or_meta_referencing_questions', async () => {
+    const studentId = 'anne';
+    const hemaQuiz = Quiz.create({
+      studentId,
+      materialId: 'mat-hema',
+      title: 'Quiz: Hematologia I',
+      questions: [
+        {
+          prompt:
+            'O que caracteriza um arquivo de dados biomédicos classificado como corrompido ou ilegível nos Sistemas de Informação Laboratorial (LIS) em hematologia?',
+          options: [
+            'Estrutura de bytes alterada no cabeçalho',
+            'Aumento de reticulócitos',
+            'Anemia ferropriva',
+            'Leucocitose',
+          ],
+          correctAnswerIndex: 0,
+          explanation: 'Falha de leitura binária.',
+        },
+        {
+          prompt: 'Qual hormônio estimula a eritropoiese na medula óssea vermelha?',
+          options: ['Eritropoietina', 'Insulina', 'Glucagon', 'Cortisol'],
+          correctAnswerIndex: 0,
+          explanation: 'Produzida pelos rins.',
+        },
+      ],
+    });
+
+    const useCase = new GetQuizSessionUseCase({
+      save: vi.fn(),
+      findById: vi.fn(),
+      findByMaterialId: vi.fn(),
+      findByStudentId: vi.fn().mockResolvedValue([hemaQuiz]),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    });
+
+    const result = await useCase.execute({ studentId, count: 5 });
+
+    expect(result.questions).toHaveLength(1);
+    expect(result.questions[0].prompt).toContain('eritropoiese');
+    expect(result.questions.some((q) => q.prompt.includes('corrompido'))).toBe(false);
+  });
 });

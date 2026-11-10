@@ -243,4 +243,53 @@ describe('QualityGateAgent — Controle de Qualidade e Deduplicação', () => {
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/fora do conteúdo/i);
   });
+
+  it('RN_STU_006_WHEN_flashcard_mentions_corrupted_or_unreadable_file_bytes_in_hematology_SHALL_reject_batch', () => {
+    const flashcards = [
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-hema',
+        front:
+          'O que caracteriza um arquivo de dados biomédicos classificado como corrompido ou ilegível nos Sistemas de Informação Laboratorial (LIS) em hematologia?',
+        back:
+          'Um arquivo corrompido ou ilegível é aquele cuja estrutura de bytes original sofreu alteração involuntária ou degradação de dados, impedindo que os softwares analíticos interpretem seu cabeçalho ou conteúdo.',
+      }),
+    ];
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo de Hematologia I sobre eritropoiese e série vermelha.',
+      ['eritropoiese', 'hemoglobina'],
+      flashcards,
+      null,
+      'A eritropoiese ocorre na medula óssea vermelha sob estímulo da eritropoietina renal.'
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/formato de documento|fora do conteúdo|ancoragem/i);
+  });
+
+  it('RN_STU_007_WHEN_flashcard_or_quiz_has_zero_grounding_in_source_corpus_SHALL_reject_batch', () => {
+    const hematologiaCorpus =
+      'A eritropoiese ocorre na medula óssea vermelha sob estímulo da eritropoietina renal. Os reticulócitos são eritrócitos jovens liberados na corrente sanguínea contendo RNA residual.';
+
+    const ungroundedFlashcards = [
+      Flashcard.create({
+        studentId: 'usr-1',
+        materialId: 'mat-hema',
+        front: 'Como funciona o protocolo de roteamento BGP entre sistemas autônomos na internet?',
+        back: 'O Border Gateway Protocol troca informações de alcançabilidade de sub-redes via TCP porta 179.',
+      }),
+    ];
+
+    const result = qualityGate.evaluateQuality(
+      'Resumo sobre eritropoiese na medula óssea.',
+      ['eritropoiese', 'reticulócitos'],
+      ungroundedFlashcards,
+      null,
+      hematologiaCorpus
+    );
+
+    expect(result.passed).toBe(false);
+    expect(result.reason).toMatch(/ancoragem|material enviado/i);
+  });
 });

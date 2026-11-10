@@ -36,6 +36,23 @@ const OFF_TOPIC_HINTS = [
   'no anexo',
   'texto enviado',
   'material enviado',
+  'arquivo corrompido',
+  'arquivos corrompidos',
+  'arquivo ilegível',
+  'arquivo ilegivel',
+  'corrompido ou ilegível',
+  'corrompido ou ilegivel',
+  'estrutura de bytes',
+  'bytes original',
+  'dados binários brutos',
+  'dados binarios brutos',
+  'arquivo compactado',
+  'não foi possível extrair',
+  'nao foi possivel extrair',
+  'não foi possível ler',
+  'nao foi possivel ler',
+  'sistemas de informação laboratorial',
+  'sistemas de informacao laboratorial',
 ];
 
 const STOP_WORDS = new Set([
@@ -86,6 +103,14 @@ export function isDocumentMetaReferencing(text: string): boolean {
   // Detecta explicitamente "pdf", "documento", "arquivo" quando usados no contexto de estrutura técnica do arquivo
   const explicitFormatRegex = /\b(pdf|metadado|metadados|creationdate|moddate)\b/i;
   if (explicitFormatRegex.test(t)) return true;
+
+  // Detecta alucinações sobre arquivo corrompido, ilegível, bytes alterados ou cabeçalho ininterpretável
+  if (/\b(arquivo|documento|dados|stream|pdf|docx|zip)\b[^.?!]{0,80}\b(corrompid[oa]s?|ileg[ií]ve(?:l|is)|bin[aá]ri[oa]s?|bytes)\b/i.test(t)) {
+    return true;
+  }
+  if (/\b(corrompid[oa]s?|ileg[ií]ve(?:l|is)|estrutura de bytes)\b[^.?!]{0,80}\b(arquivo|documento|cabe[cç]alho|software|bytes|leitura|extra[cç][aã]o)\b/i.test(t)) {
+    return true;
+  }
 
   return false;
 }
@@ -157,8 +182,86 @@ export function isUnusableStudyCorpus(text: string): boolean {
   const sample = text.slice(0, 400);
   const printable = sample.replace(/[^\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]/g, '');
   if (printable.length / Math.max(sample.length, 1) < 0.55) return true;
-  if (/dados binários brutos|arquivo compactado \(estrutura interna/i.test(text)) return true;
+  if (
+    /dados bin[aá]rios brutos|arquivo compactado \(estrutura interna|corrompid[oa]s? ou ileg[ií]ve(?:l|is)|n[aã]o foi poss[ií]vel (?:ler|extrair) o (?:arquivo|documento|texto)|falha na estrutura de bytes/i.test(
+      text
+    )
+  ) {
+    return true;
+  }
   return false;
+}
+
+export function isGroundedInCorpus(
+  itemText: string,
+  corpusText?: string,
+  keyConcepts?: readonly string[]
+): boolean {
+  if (!itemText || !itemText.trim()) return false;
+  if (isDocumentMetaReferencing(itemText) || isPedagogicallyOffTopic(itemText)) {
+    return false;
+  }
+
+  const cleanCorpus = (corpusText || '').trim();
+  const conceptsText = (keyConcepts || []).join(' ').trim();
+  if (cleanCorpus.length < 45 && conceptsText.length === 0) {
+    return true;
+  }
+
+  const corpusOnlyTokens = tokenize(cleanCorpus);
+  if (corpusOnlyTokens.size < 6) {
+    return true;
+  }
+
+  const referenceTokens = tokenize(`${cleanCorpus} ${conceptsText}`);
+  if (referenceTokens.size === 0) return true;
+
+  const itemTokens = tokenize(itemText);
+  if (itemTokens.size === 0) return false;
+
+  const GENERIC_ACADEMIC_STOP = new Set([
+    'qual', 'quais', 'como', 'caracteriza', 'define', 'definicao', 'conceito',
+    'fundamental', 'processo', 'funciona', 'mecanismo', 'sistema', 'sistemas',
+    'estrutura', 'original', 'sofreu', 'alteracao', 'dados', 'arquivo', 'arquivos',
+    'documento', 'conteudo', 'principio', 'aplica', 'pratica', 'impacto', 'direto',
+    'ponto', 'critico', 'distincao', 'quanto', 'explicacao', 'essencial', 'garante',
+    'retencao', 'ativa', 'fundamento', 'correta', 'alternativa', 'questao', 'materia',
+    'disciplina', 'estudo',
+  ]);
+
+  let meaningfulMatches = 0;
+  for (const token of itemTokens) {
+    if (GENERIC_ACADEMIC_STOP.has(token)) continue;
+    if (referenceTokens.has(token)) {
+      meaningfulMatches++;
+    } else {
+      // Stemming prefix match (>= 5 chars) para lidar com plurais/conjugações em PT-BR
+      const stem = token.slice(0, Math.min(token.length, 6));
+      if (stem.length >= 5) {
+        for (const ref of referenceTokens) {
+          if (ref.startsWith(stem) || token.startsWith(ref.slice(0, Math.min(ref.length, 6)))) {
+            meaningfulMatches++;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return meaningfulMatches >= 1;
+}
+
+export function filterTopicsGroundedInCorpus(
+  topics: ReadonlyArray<{ topic: string; priorityWeight: number }>,
+  corpusText?: string,
+  keyConcepts?: readonly string[]
+): Array<{ topic: string; priorityWeight: number }> {
+  if (!topics || topics.length === 0) return [];
+  const cleanCorpus = (corpusText || '').trim();
+  const conceptsText = (keyConcepts || []).join(' ').trim();
+  if (cleanCorpus.length < 20 && conceptsText.length === 0) return [];
+
+  return topics.filter((item) => isGroundedInCorpus(item.topic, cleanCorpus, keyConcepts));
 }
 
 export function materialHasStudyCorpus(rawContent?: string, summary?: string): boolean {

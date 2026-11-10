@@ -10,7 +10,12 @@ import { IStudentAdaptiveProfileRepository } from './EvaluateQuizUseCase.js';
 import { FlashcardSpecialistAgent } from '../services/pedagogical-agents/FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from '../services/pedagogical-agents/QuizSpecialistAgent.js';
 import { cardMatchesSubject, composeAdaptiveSession, materialMatchesTopic } from '../services/FlashcardStudySession.js';
-import { materialHasStudyCorpus } from '../services/StudyCorpusSanitizer.js';
+import {
+  materialHasStudyCorpus,
+  filterTopicsGroundedInCorpus,
+  isDocumentMetaReferencing,
+  isPedagogicallyOffTopic,
+} from '../services/StudyCorpusSanitizer.js';
 import { UnprocessableError } from '../errors/DomainError.js';
 import {
   composeQuizSession,
@@ -112,15 +117,22 @@ export class GenerateExtraSessionUseCase {
     if (selected.length > 0 && (targetType === 'flashcards' || targetType === 'both')) {
       const perMaterial = Math.max(4, Math.ceil(count / selected.length));
       for (const material of selected) {
+        const materialCorpus = material.rawContent || material.summary || '';
+        const materialFocusTopics = filterTopicsGroundedInCorpus(
+          focusTopics,
+          materialCorpus,
+          material.keyConcepts
+        );
         const batch = await this.flashcardAgent.generateFlashcards(
           material.id,
           studentId,
-          material.rawContent || material.summary || material.title,
-          [material.subject, ...material.keyConcepts].filter((item): item is string => Boolean(item)),
-          focusTopics,
+          materialCorpus,
+          material.keyConcepts.filter((item): item is string => Boolean(item)),
+          materialFocusTopics,
           true,
           undefined,
-          perMaterial
+          perMaterial,
+          material.subject
         );
         generatedFlashcards.push(...batch);
       }
@@ -130,15 +142,22 @@ export class GenerateExtraSessionUseCase {
       const questionsNeeded = Math.max(4, Math.ceil(count * 0.55));
       const perMaterial = Math.max(3, Math.ceil(questionsNeeded / selected.length));
       for (const material of selected) {
+        const materialCorpus = material.rawContent || material.summary || '';
+        const materialFocusTopics = filterTopicsGroundedInCorpus(
+          focusTopics,
+          materialCorpus,
+          material.keyConcepts
+        );
         const quiz = await this.quizAgent.generateQuiz(
           material.id,
           studentId,
           `Sessão Extra: ${topic && topic !== 'all' ? topic : material.title}`,
-          material.rawContent || material.summary || material.title,
-          focusTopics,
+          materialCorpus,
+          materialFocusTopics,
           true,
           undefined,
-          perMaterial
+          perMaterial,
+          material.keyConcepts
         );
         if (quiz) {
           generatedQuizzes.push(quiz);
@@ -152,8 +171,13 @@ export class GenerateExtraSessionUseCase {
     const materialById = new Map(
       (targetMaterials || []).map((material) => [material.id, material] as const)
     );
-    const scopedPool = [...dueCards, ...bankCards].filter((card) =>
-      cardMatchesSubject(card, materialById.get(card.materialId), topic, allowedSubjects)
+    const scopedPool = [...dueCards, ...bankCards].filter(
+      (card) =>
+        !isDocumentMetaReferencing(card.front) &&
+        !isDocumentMetaReferencing(card.back) &&
+        !isPedagogicallyOffTopic(card.front) &&
+        !isPedagogicallyOffTopic(card.back) &&
+        cardMatchesSubject(card, materialById.get(card.materialId), topic, allowedSubjects)
     );
     const mixed = composeAdaptiveSession({
       newCards: generatedFlashcards,
@@ -168,7 +192,12 @@ export class GenerateExtraSessionUseCase {
     const generatedQuizIds = new Set(generatedQuizzes.map((quiz) => quiz.id));
     const bankQuestions = flattenQuizzes(existingQuizzes)
       .filter((item) => !generatedQuizIds.has(item.quizId))
-      .filter((item) => questionMatchesTopic(item, topic, allowedSubjects));
+      .filter(
+        (item) =>
+          !isDocumentMetaReferencing(item.prompt) &&
+          !isPedagogicallyOffTopic(item.prompt) &&
+          questionMatchesTopic(item, topic, allowedSubjects)
+      );
     const newQuestions = flattenQuizzes(generatedQuizzes);
     const quizMixed = composeQuizSession({
       newQuestions,

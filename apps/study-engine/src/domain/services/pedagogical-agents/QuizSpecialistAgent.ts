@@ -5,6 +5,7 @@ import {
   isDocumentMetaReferencing,
   isDuplicateOrHighlySimilar,
   isPedagogicallyOffTopic,
+  isGroundedInCorpus,
 } from '../StudyCorpusSanitizer.js';
 import { GENERATION_SIMILARITY_THRESHOLD } from '../FlashcardStudySession.js';
 
@@ -22,7 +23,8 @@ export class QuizSpecialistAgent {
     focusTopics?: Array<{ topic: string; priorityWeight: number }>,
     persist = true,
     cacheHandle?: ContextCacheHandle | null,
-    count = 4
+    count = 4,
+    keyConcepts?: readonly string[]
   ): Promise<Quiz | null> {
     const existingMaterialQuizzes = (await this.quizRepository.findByMaterialId(materialId)) || [];
     const studentQuizzes = (await this.quizRepository.findByStudentId?.(studentId)) || [];
@@ -48,6 +50,15 @@ export class QuizSpecialistAgent {
       if (!q || !q.prompt) return false;
       if (isDocumentMetaReferencing(q.prompt)) return false;
       if (isPedagogicallyOffTopic(q.prompt)) return false;
+      if (
+        !isGroundedInCorpus(
+          `${q.prompt} ${(q.options || []).join(' ')} ${q.explanation || ''}`,
+          rawText,
+          keyConcepts
+        )
+      ) {
+        return false;
+      }
       if (isDuplicateOrHighlySimilar(q.prompt, accumulatedPrompts, GENERATION_SIMILARITY_THRESHOLD)) return false;
 
       accumulatedPrompts.push(q.prompt.trim());

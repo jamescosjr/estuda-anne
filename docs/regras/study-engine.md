@@ -10,11 +10,12 @@
 
 ## Ordem de Avaliação e Pipeline de Negócio
 1. `RN-STU-005` (Sanitização e Segurança do Corpus)
-2. `RN-STU-006` (Gate de Qualidade Pedagógica de IA)
-3. `RN-STU-001` (Validação de Flashcards)
-4. `RN-STU-002` (Espaçamento e Repetição SM-2)
-5. `RN-STU-003` (Elegibilidade para Revisão — Due Date)
-6. `RN-STU-004` (Encerramento de Semestre e Limpeza LGPD)
+2. `RN-STU-007` (Ancoragem Estrita no Material do Usuário e Isolamento de Corpus)
+3. `RN-STU-006` (Gate de Qualidade Pedagógica de IA)
+4. `RN-STU-001` (Validação de Flashcards)
+5. `RN-STU-002` (Espaçamento e Repetição SM-2)
+6. `RN-STU-003` (Elegibilidade para Revisão — Due Date)
+7. `RN-STU-004` (Encerramento de Semestre e Limpeza LGPD)
 
 ---
 
@@ -64,20 +65,31 @@
 
 ### RN-STU-005 — Sanitização e Filtragem de Corpus de Estudo
 - **EARS**:
-  `WHEN o texto de um material de estudo for extraído THE SYSTEM SHALL higienizar caracteres de controle e sequências de prompt injection IF o texto contiver tentativas de jailbreak, payloads maliciosos ou tamanho inferior ao limiar mínimo THEN THE SYSTEM SHALL rejeitar o processamento com DomainRuleViolation('RN-STU-005', 'corpus_invalido_ou_inseguro') THE SYSTEM SHALL CONTINUE TO preservar a semântica didática do conteúdo acadêmico genuíno`
-- **Código**: `apps/study-engine/src/domain/services/StudyCorpusSanitizer.ts`, `apps/study-engine/src/domain/usecases/ProcessMaterialUseCase.ts`
-- **Teste**: `apps/study-engine/tests/domain/StudyCorpusSanitizer.test.ts`
+  `WHEN o texto de um material de estudo for extraído ou analisado THE SYSTEM SHALL higienizar caracteres de controle e sequências de prompt injection IF o texto ou a análise inicial contiver tentativas de jailbreak, payloads maliciosos, indicadores de arquivo corrompido ou ilegível, estrutura de bytes alterada, falha de extração ou tamanho inferior ao limiar mínimo THEN THE SYSTEM SHALL rejeitar o processamento com DomainRuleViolation('RN-STU-005', 'corpus_invalido_ou_inseguro') THE SYSTEM SHALL CONTINUE TO preservar a semântica didática do conteúdo acadêmico genuíno`
+- **Código**: `apps/study-engine/src/domain/services/StudyCorpusSanitizer.ts`, `apps/study-engine/src/domain/usecases/ProcessMaterialUseCase.ts`, `apps/study-engine/src/domain/services/pedagogical-agents/PedagogicalCoordinatorAgent.ts`
+- **Teste**: `apps/study-engine/tests/domain/StudyCorpusSanitizer.test.ts`, `apps/study-engine/tests/domain/ProcessMaterialUseCase.test.ts`
 - **Confiança**: `verified`
 - **Dono**: Segurança / Engenheiro de IA
-- **Última revisão**: 2026-09-26
+- **Última revisão**: 2026-11-10
 
 ---
 
 ### RN-STU-006 — Gate de Qualidade Pedagógica e Resiliência da IA
 - **EARS**:
-  `WHEN o modelo de IA gerar itens de estudo (quizzes, flashcards ou cronograma) THE SYSTEM SHALL submeter o payload ao QualityGateAgent IF o payload contiver alucinações estruturais, menos de 4 alternativas por questão, ou resposta correta inconsistente THEN THE SYSTEM SHALL rejeitar o output e executar circuito autônomo de retry com instrução corretiva até o limite de 3 tentativas`
-- **Código**: `apps/study-engine/src/domain/services/QualityGateAgent.ts`, `apps/study-engine/src/infrastructure/adapters/GeminiFlashAdapter.ts`
+  `WHEN o modelo de IA gerar itens de estudo (quizzes, flashcards ou cronograma) THE SYSTEM SHALL submeter o payload ao QualityGateAgent IF o payload contiver alucinações estruturais, menções a arquivo corrompido ou ilegível, estrutura de bytes, menos de 4 alternativas por questão, resposta correta inconsistente ou falta de ancoragem lexical no corpus do material THEN THE SYSTEM SHALL rejeitar o output e executar circuito autônomo de retry com instrução corretiva até o limite de 3 tentativas`
+- **Código**: `apps/study-engine/src/domain/services/pedagogical-agents/QualityGateAgent.ts`, `apps/study-engine/src/infrastructure/ai/GeminiFlashAdapter.ts`
 - **Teste**: `apps/study-engine/tests/domain/QualityGateAgent.test.ts`, `apps/study-engine/tests/infrastructure/GeminiFlashAdapter.test.ts`
 - **Confiança**: `verified`
 - **Dono**: Coordinator / QA
-- **Última revisão**: 2026-09-26
+- **Última revisão**: 2026-11-10
+
+---
+
+### RN-STU-007 — Ancoragem Estrita no Material Enviado e Isolamento de Corpus por Disciplina
+- **EARS**:
+  `WHEN o sistema gerar ou servir flashcards e questões de quiz THE SYSTEM SHALL extrair conceitos, perguntas e respostas exclusivamente do corpus válido do material enviado pelo estudante sem injetar o nome da disciplina como conceito-chave para geração e sem misturar tópicos fracos de outras matérias IF um item gerado ou persistido não possuir ancoragem lexical mínima no corpus do material ou contiver mistura de falha de arquivo/bytes com a disciplina THEN THE SYSTEM SHALL descartar o item na geração e filtrá-lo nas sessões de estudo`
+- **Código**: `apps/study-engine/src/domain/services/StudyCorpusSanitizer.ts`, `apps/study-engine/src/domain/services/pedagogical-agents/FlashcardSpecialistAgent.ts`, `apps/study-engine/src/domain/services/pedagogical-agents/QuizSpecialistAgent.ts`, `apps/study-engine/src/domain/usecases/GenerateExtraSessionUseCase.ts`, `apps/study-engine/src/domain/usecases/GetDueFlashcardsUseCase.ts`, `apps/study-engine/src/domain/usecases/GetQuizSessionUseCase.ts`
+- **Teste**: `apps/study-engine/tests/domain/StudyCorpusSanitizer.test.ts`, `apps/study-engine/tests/domain/QualityGateAgent.test.ts`, `apps/study-engine/tests/domain/GenerateExtraSessionUseCase.test.ts`, `apps/study-engine/tests/domain/GetDueFlashcardsUseCase.test.ts`, `apps/study-engine/tests/domain/GetQuizSessionUseCase.test.ts`
+- **Confiança**: `verified`
+- **Dono**: Time Pedagógico / PO
+- **Última revisão**: 2026-11-10

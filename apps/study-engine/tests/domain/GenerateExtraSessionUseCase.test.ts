@@ -291,4 +291,67 @@ describe('GenerateExtraSessionUseCase', () => {
     expect(result.sessionQuestions.length).toBeGreaterThanOrEqual(2);
     expect(result.weakTopics.some((t) => t.toLowerCase().includes('integral'))).toBe(true);
   });
+
+  it('RN_STU_007_WHEN_generating_extra_session_for_material_SHALL_not_inject_weak_topics_from_unrelated_subjects_nor_subject_name_as_concept', async () => {
+    const studentId = 'anne-hema';
+    const hemaMaterial = Material.reconstitute({
+      id: 'mat-hema',
+      studentId,
+      title: 'Apostila de Hematologia Clínica',
+      subject: 'Hematologia I',
+      summary: 'A eritropoiese ocorre na medula óssea sob estímulo da eritropoietina.',
+      keyConcepts: ['eritropoiese', 'eritropoietina', 'reticulócitos'],
+      rawContent:
+        'A eritropoiese ocorre na medula óssea vermelha sob estímulo da eritropoietina renal. Os reticulócitos são eritrócitos jovens liberados na corrente sanguínea contendo RNA residual.',
+      format: 'PDF',
+      fileUrl: 'https://storage/hema.pdf',
+      fileSizeBytes: 2048,
+      mimeType: 'application/pdf',
+      status: 'READY',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    // Perfil adaptativo tem tópicos fracos de Cálculo / Forense ("estrutura de bytes", "integral") e um de Hematologia ("eritropoiese")
+    const profile = StudentAdaptiveProfile.createDefault(studentId).recordQuizResult([
+      { topic: 'estrutura de bytes em arquivo', isCorrect: false },
+      { topic: 'integral definida de polinomios', isCorrect: false },
+      { topic: 'eritropoiese medular', isCorrect: false },
+    ]);
+
+    mockMaterialRepository.findByStudentId.mockResolvedValue([hemaMaterial]);
+    mockProfileRepository.findByStudentId.mockResolvedValue(profile);
+
+    mockAiService.generateFlashcards.mockResolvedValue([
+      {
+        front: 'Onde ocorre a eritropoiese e qual hormônio a estimula?',
+        back: 'Na medula óssea vermelha sob estímulo da eritropoietina.',
+      },
+    ]);
+    mockAiService.generateQuizQuestions.mockResolvedValue([]);
+
+    const useCase = new GenerateExtraSessionUseCase(
+      mockMaterialRepository,
+      mockFlashcardRepository,
+      mockQuizRepository,
+      mockAiService,
+      mockProfileRepository
+    );
+
+    const result = await useCase.execute({
+      studentId,
+      targetType: 'flashcards',
+      count: 5,
+    });
+
+    expect(mockAiService.generateFlashcards).toHaveBeenCalled();
+    const [, , , passedFocusTopics, passedOptions] = mockAiService.generateFlashcards.mock.calls[0];
+
+    // Não deve enviar tópicos de Cálculo ou de bytes/arquivo para o prompt de Hematologia
+    expect(passedFocusTopics.map((t: any) => t.topic)).toEqual(['eritropoiese medular']);
+    // Não deve injetar "Hematologia I" na lista de keyConcepts do prompt da IA (apenas conceitos do texto)
+    expect(passedOptions.keyConcepts).toEqual(['eritropoiese', 'eritropoietina', 'reticulócitos']);
+    // Mas o card salvo preserva "Hematologia I" nas tags de organização
+    expect(result.flashcards[0].tags).toContain('Hematologia I');
+  });
 });

@@ -3,8 +3,15 @@ import { MaterialEvaluatorAgent } from './MaterialEvaluatorAgent.js';
 import { FlashcardSpecialistAgent } from './FlashcardSpecialistAgent.js';
 import { QuizSpecialistAgent } from './QuizSpecialistAgent.js';
 import { QualityGateAgent } from './QualityGateAgent.js';
-import { sanitizeStudyCorpus, toFocusTopics } from '../StudyCorpusSanitizer.js';
+import {
+  sanitizeStudyCorpus,
+  toFocusTopics,
+  isUnusableStudyCorpus,
+  isDocumentMetaReferencing,
+  isPedagogicallyOffTopic,
+} from '../StudyCorpusSanitizer.js';
 import { ILanguageModelService, ContextCacheHandle } from '../../ports/ILanguageModelService.js';
+import { DomainRuleViolation } from '../../errors/DomainError.js';
 
 export interface CoordinatorPipelineResult {
   materialId: string;
@@ -52,6 +59,15 @@ export class PedagogicalCoordinatorAgent {
         cacheHandle
       );
 
+      if (
+        isUnusableStudyCorpus(analysis.summary) ||
+        isDocumentMetaReferencing(analysis.summary) ||
+        isPedagogicallyOffTopic(analysis.summary) ||
+        analysis.keyConcepts.some((c) => isDocumentMetaReferencing(c) || isPedagogicallyOffTopic(c))
+      ) {
+        throw new DomainRuleViolation('RN-STU-005', 'corpus_invalido_ou_inseguro');
+      }
+
       const focusTopics = toFocusTopics(analysis.keyConcepts);
 
       // 3. Loop Autônomo de Qualidade e Reajuste Pedagógico (até 3 tentativas)
@@ -65,11 +81,12 @@ export class PedagogicalCoordinatorAgent {
           material.id,
           material.studentId,
           studyText,
-          [material.subject, ...analysis.keyConcepts].filter((item): item is string => Boolean(item)),
+          analysis.keyConcepts.filter((item): item is string => Boolean(item)),
           focusTopics,
           false,
           cacheHandle,
-          8
+          8,
+          material.subject
         );
 
         quiz = await this.quizAgent.generateQuiz(
@@ -86,7 +103,8 @@ export class PedagogicalCoordinatorAgent {
           analysis.summary,
           analysis.keyConcepts,
           flashcards,
-          quiz
+          quiz,
+          studyText
         );
 
         if (qualityResult.passed) {

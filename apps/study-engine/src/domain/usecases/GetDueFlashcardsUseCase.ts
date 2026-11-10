@@ -6,7 +6,11 @@ import {
   subjectBucket,
   uniqueByExactFront,
 } from '../services/FlashcardStudySession.js';
-import { isGenericPlaceholderPrompt } from '../services/StudyCorpusSanitizer.js';
+import {
+  isDocumentMetaReferencing,
+  isGenericPlaceholderPrompt,
+  isPedagogicallyOffTopic,
+} from '../services/StudyCorpusSanitizer.js';
 
 export interface GetDueFlashcardsInput {
   studentId: string;
@@ -46,9 +50,16 @@ export class GetDueFlashcardsUseCase {
     const matchesTopic = (card: Flashcard) =>
       cardMatchesSubject(card, materialById.get(card.materialId), input.topic, input.allowedSubjects);
 
+    const isCleanCard = (card: Flashcard) =>
+      !isGenericPlaceholderPrompt(card.front) &&
+      !isDocumentMetaReferencing(card.front) &&
+      !isDocumentMetaReferencing(card.back) &&
+      !isPedagogicallyOffTopic(card.front) &&
+      !isPedagogicallyOffTopic(card.back);
+
     const due = await this.flashcardRepository.findDueCards(input.studentId, targetDate, limit);
     const usableDue = uniqueByExactFront(due)
-      .filter((card) => !isGenericPlaceholderPrompt(card.front))
+      .filter(isCleanCard)
       .filter(matchesTopic);
 
     if (usableDue.length >= limit) {
@@ -63,7 +74,7 @@ export class GetDueFlashcardsUseCase {
     const fill = uniqueByExactFront(bank).filter(
       (card) =>
         !dueIds.has(card.id) &&
-        !isGenericPlaceholderPrompt(card.front) &&
+        isCleanCard(card) &&
         matchesTopic(card)
     );
 

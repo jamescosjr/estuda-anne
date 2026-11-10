@@ -346,4 +346,73 @@ describe('ProcessMaterialUseCase', () => {
     );
     expect(aiService.deleteContextCache).toHaveBeenCalledWith(mockCacheHandle);
   });
+
+  it('RN_STU_005_WHEN_corpus_or_ai_summary_indicates_corrupted_or_unreadable_file_SHALL_throw_DomainRuleViolation', async () => {
+    const material = Material.create({
+      id: 'mat-corrupt-01',
+      studentId: 'usr-anne',
+      title: 'Apostila Hematologia I',
+      subject: 'Hematologia I',
+      format: 'PDF',
+      fileUrl: 'https://storage.estuda-anne.com/hema.pdf',
+      fileSizeBytes: 2048,
+      mimeType: 'application/pdf',
+    });
+
+    const materialRepo: IMaterialRepository = {
+      save: vi.fn(),
+      findById: vi.fn().mockResolvedValue(material),
+      findByStudentId: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteManyByIds: vi.fn(),
+    };
+
+    const flashcardRepo: IFlashcardRepository = {
+      save: vi.fn(),
+      saveMany: vi.fn(),
+      findById: vi.fn(),
+      findByStudentId: vi.fn(),
+      findDueCards: vi.fn(),
+      findByMaterialId: vi.fn().mockResolvedValue([]),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+
+    const quizRepo: IQuizRepository = {
+      save: vi.fn(),
+      findById: vi.fn(),
+      findByMaterialId: vi.fn().mockResolvedValue([]),
+      findByStudentId: vi.fn(),
+      delete: vi.fn(),
+      deleteByStudentId: vi.fn(),
+    };
+
+    const aiService: ILanguageModelService = {
+      extractConceptsAndSummary: vi.fn().mockResolvedValue({
+        summary: 'O arquivo enviado está corrompido ou ilegível, com falha na estrutura de bytes.',
+        keyConcepts: ['arquivo corrompido'],
+      }),
+      generateFlashcards: vi.fn().mockResolvedValue([]),
+      generateQuizQuestions: vi.fn().mockResolvedValue([]),
+    };
+
+    const useCase = new ProcessMaterialUseCase(
+      materialRepo,
+      flashcardRepo,
+      quizRepo,
+      aiService,
+      { transcribe: vi.fn() }
+    );
+
+    await expect(
+      useCase.execute({
+        materialId: 'mat-corrupt-01',
+        textContent: 'Texto suficiente porém a análise da IA detectou documento corrompido ou ilegível na leitura.',
+      })
+    ).rejects.toThrow(/RN-STU-005/);
+
+    expect(flashcardRepo.saveMany).not.toHaveBeenCalled();
+  });
 });

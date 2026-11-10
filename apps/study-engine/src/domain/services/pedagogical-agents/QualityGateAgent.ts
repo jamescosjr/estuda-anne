@@ -4,6 +4,7 @@ import {
   isPedagogicallyOffTopic,
   isDocumentMetaReferencing,
   isDuplicateOrHighlySimilar,
+  isGroundedInCorpus,
 } from '../StudyCorpusSanitizer.js';
 
 export interface QualityCheckResult {
@@ -17,10 +18,19 @@ export class QualityGateAgent {
     summary: string,
     keyConcepts: readonly string[],
     flashcards: Flashcard[],
-    quiz: Quiz | null
+    quiz: Quiz | null,
+    sourceCorpus?: string
   ): QualityCheckResult {
     if (!summary || summary.trim().length === 0) {
       return { passed: false, score: 0, reason: 'Resumo ausente ou insuficiente' };
+    }
+
+    if (isDocumentMetaReferencing(summary) || isPedagogicallyOffTopic(summary)) {
+      return {
+        passed: false,
+        score: 10,
+        reason: 'Resumo contém referências a falha de leitura, arquivo corrompido ou metadados de documento',
+      };
     }
 
     if (!keyConcepts || keyConcepts.length === 0) {
@@ -31,14 +41,32 @@ export class QualityGateAgent {
       return { passed: false, score: 50, reason: 'Flashcards pedagógicos não gerados' };
     }
 
-    // Validação de duplicidade, referências a PDF/documento e qualidade em Flashcards
+    const groundingCorpus = [sourceCorpus, summary].filter(Boolean).join(' ');
+
+    // Validação de duplicidade, referências a PDF/documento, ancoragem no corpus e qualidade em Flashcards
     const flashcardFronts: string[] = [];
     for (const fc of flashcards) {
-      if (isDocumentMetaReferencing(fc.front) || isDocumentMetaReferencing(fc.back)) {
+      if (
+        isDocumentMetaReferencing(fc.front) ||
+        isDocumentMetaReferencing(fc.back) ||
+        isPedagogicallyOffTopic(fc.front) ||
+        isPedagogicallyOffTopic(fc.back)
+      ) {
         return {
           passed: false,
           score: 60,
           reason: `Flashcard contém referências a formato de documento ou PDF: "${fc.front.slice(0, 45)}"`,
+        };
+      }
+
+      if (
+        groundingCorpus.trim().length >= 30 &&
+        !isGroundedInCorpus(`${fc.front} ${fc.back}`, groundingCorpus, keyConcepts)
+      ) {
+        return {
+          passed: false,
+          score: 58,
+          reason: `Flashcard sem ancoragem lexical no material enviado pelo usuário: "${fc.front.slice(0, 45)}"`,
         };
       }
 
@@ -60,7 +88,7 @@ export class QualityGateAgent {
       flashcardFronts.push(fc.front.trim());
     }
 
-    // Validação de duplicidade e qualidade no Quiz
+    // Validação de duplicidade, ancoragem e qualidade no Quiz
     if (quiz && quiz.questions.length > 0) {
       const questionPrompts: string[] = [];
       for (const q of quiz.questions) {
@@ -69,6 +97,17 @@ export class QualityGateAgent {
             passed: false,
             score: 65,
             reason: 'Pergunta fora do conteúdo da matéria (metadados, data de arquivo, PDF ou aluna Anne)',
+          };
+        }
+
+        if (
+          groundingCorpus.trim().length >= 30 &&
+          !isGroundedInCorpus(`${q.prompt} ${q.options.join(' ')}`, groundingCorpus, keyConcepts)
+        ) {
+          return {
+            passed: false,
+            score: 62,
+            reason: `Questão de quiz sem ancoragem no material enviado pelo usuário: "${q.prompt.slice(0, 45)}"`,
           };
         }
 
