@@ -33,8 +33,8 @@ export function AdminStudentsManagement() {
   const { user: authUser, token: globalToken } = useAuth()
 
   const [token, setToken] = useState<string>('')
-  const [adminEmail, setAdminEmail] = useState('james@estuda-anne.com')
-  const [adminPassword, setAdminPassword] = useState('Admin@EstudaAnne2026!')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminPassword, setAdminPassword] = useState('')
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   const [students, setStudents] = useState<StudentUser[]>([])
